@@ -1,0 +1,207 @@
+"""Local Wav2Vec2 ASR backend using the existing Torch runtime.
+
+This backend is intentionally small and opt-in.  The model is downloaded from
+Hugging Face only when selected, stored under the project cache, and moved to
+CUDA when the installed Torch runtime exposes an NVIDIA device.
+"""
+
+from __future__ import annotations
+
+import math
+import wave
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from .cancellation import CancelCheck, check_cancelled
+
+
+@dataclass(frozen=True)
+class Wav2VecModelSpec:
+    model_id: str
+    label: str
+    repository: str
+    language: str
+    license: str
+
+
+WAV2VEC2_MODEL_SPECS: dict[str, Wav2VecModelSpec] = {
+    "wav2vec2-base-960h": Wav2VecModelSpec(
+        "wav2vec2-base-960h",
+        "Wav2Vec2 · English · GPU capable",
+        "facebook/wav2vec2-base-960h",
+        "en",
+        "Apache-2.0",
+    ),
+}
+WAV2VEC2_MODEL_LABELS = {key: spec.label for key, spec in WAV2VEC2_MODEL_SPECS.items()}
+
+
+def model_spec(model_id: str) -> Wav2VecModelSpec:
+    try:
+        return WAV2VEC2_MODEL_SPECS[model_id]
+    except KeyError as exc:
+        raise RuntimeError(f"Unknown Wav2Vec2 model '{model_id}'.") from exc
+
+
+def _load_session(model_id: str, model_cache: str | Path, device: str, progress, cancel: CancelCheck | None):
+    spec = model_spec(model_id)
+    check_cancelled(cancel)
+    try:
+        import torch
+        from transformers import AutoModelForCTC, AutoProcessor
+    except ImportError as exc:
+        raise RuntimeError(
+            "Wav2Vec2 needs the Transformers package. Run setup.bat again to install the optional GPU backend."
+        ) from exc
+    cache_dir = Path(model_cache).resolve()
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    if progress:
+        progress(0.30, f"Loading Wav2Vec2 model: {spec.label}…")
+    processor = AutoProcessor.from_pretrained(spec.repository, cache_dir=str(cache_dir))
+    check_cancelled(cancel)
+    model = AutoModelForCTC.from_pretrained(spec.repository, cache_dir=str(cache_dir))
+    check_cancelled(cancel)
+    selected_device = device if device in {"cuda", "mps"} and (
+        (device == "cuda" and torch.cuda.is_available()) or (device == "mps" and getattr(torch.backends, "mps", None) and torch.backends.mps.is_available())
+    ) else "cpu"
+    if progress:
+        progress(0.42, f"Moving Wav2Vec2 into {selected_device.upper()} memory…")
+    model = model.to(selected_device)
+    model.eval()
+    if progress:
+        progress(0.48, f"Wav2Vec2 ready on {selected_device.upper()}.")
+    return processor, model, selected_device, torch
+
+
+def _segments_from_offsets(text: str, offsets: list[dict[str, Any]], frame_count: int, duration: float, offset: float):
+    if not offsets or frame_count <= 0:
+        clean = " ".join(text.split())
+        return ([{"start": offset, "end": offset + max(0.0, duration), "text": clean}] if clean else []), []
+    scale = duration / frame_count
+    words: list[dict[str, Any]] = []
+    current: list[str] = []
+    current_start: float | None = None
+    current_end = 0.0
+
+    def commit() -> None:
+        nonlocal current, current_start, current_end
+        if not current or current_start is None:
+            current = []
+            current_start = None
+            current_end = 0.0
+            return
+        word = "".join(current).strip()
+        if word:
+            words.append({"word": word, "start": offset + current_start, "end": offset + current_end})
+        current = []
+        current_start = None
+        current_end = 0.0
+
+    for item in offsets:
+        char = str(item.get("char", ""))
+        try:
+            start = float(item.get("start_offset", 0)) * scale
+            end = float(item.get("end_offset", item.get("start_offset", 0))) * scale
+        except (TypeError, ValueError):
+            continue
+        if char in {" ", "|"}:
+            commit()
+            continue
+        if current_start is None:
+            current_start = start
+        current.append(char)
+        current_end = max(current_end, end)
+    commit()
+    if not words:
+        clean = " ".join(text.split())
+        return ([{"start": offset, "end": offset + max(0.0, duration), "text": clean}] if clean else []), []
+
+    segments: list[dict[str, Any]] = []
+    group: list[dict[str, Any]] = []
+    for word in words:
+        group.append(word)
+        if len(group) >= 12 or word["word"].endswith(('.', '?', '!')):
+            segments.append({"start": group[0]["start"], "end": group[-1]["end"], "text": " ".join(item["word"] for item in group)})
+            group = []
+    if group:
+        segments.append({"start": group[0]["start"], "end": group[-1]["end"], "text": " ".join(item["word"] for item in group)})
+    return segments, words
+
+
+class Wav2Vec2Session:
+    """Reusable model session for file and rolling live recognition."""
+
+    def __init__(self, processor: Any, model: Any, device: str, torch_module: Any) -> None:
+        self.processor = processor
+        self.model = model
+        self.device = device
+        self.torch = torch_module
+
+    def transcribe_samples(self, samples: Any, *, sample_rate: int = 16000, offset: float = 0.0) -> dict[str, Any]:
+        import numpy as np
+
+        values = np.asarray(samples, dtype=np.float32).reshape(-1)
+        duration = len(values) / sample_rate if len(values) else 0.0
+        if not len(values):
+            return {"text": "", "segments": [], "words": [], "language": "en"}
+        inputs = self.processor(values, sampling_rate=sample_rate, return_tensors="pt", padding=True)
+        inputs = {key: value.to(self.device) for key, value in inputs.items() if hasattr(value, "to")}
+        with self.torch.inference_mode():
+            logits = self.model(**inputs).logits
+        predicted = self.torch.argmax(logits, dim=-1)
+        try:
+            decoded = self.processor.batch_decode(predicted, output_char_offsets=True)
+            text = decoded["text"][0] if isinstance(decoded, dict) else decoded[0]
+            offsets = decoded.get("char_offsets", [[]])[0] if isinstance(decoded, dict) else []
+        except (TypeError, ValueError, AttributeError):
+            text = self.processor.batch_decode(predicted)[0]
+            offsets = []
+        text = " ".join(str(text).split())
+        segments, words = _segments_from_offsets(text, offsets, int(logits.shape[1]), duration, offset)
+        return {"text": text, "segments": segments, "words": words, "language": "en"}
+
+
+def load_wav2vec2_session(model_id: str, model_cache: str | Path, device: str, progress=None, cancel=None) -> Wav2Vec2Session:
+    processor, model, selected_device, torch = _load_session(model_id, model_cache, device, progress, cancel)
+    return Wav2Vec2Session(processor, model, selected_device, torch)
+
+
+def transcribe_wav2vec_audio(
+    audio_path: str | Path,
+    *,
+    model_id: str,
+    model_cache: str | Path,
+    language: str,
+    device: str = "cpu",
+    progress=None,
+    cancel: CancelCheck | None = None,
+) -> dict[str, Any]:
+    """Transcribe a normalized 16 kHz mono WAV with local Wav2Vec2."""
+    session = load_wav2vec2_session(model_id, model_cache, device, progress, cancel)
+    values: bytes
+    with wave.open(str(audio_path), "rb") as audio:
+        if audio.getnchannels() != 1 or audio.getsampwidth() != 2 or audio.getframerate() != 16000:
+            raise RuntimeError("Wav2Vec2 requires normalized 16 kHz mono 16-bit audio.")
+        frames = audio.readframes(audio.getnframes())
+        values = frames
+        sample_count = len(frames) // 2
+    import numpy as np
+    samples = np.frombuffer(values, dtype=np.int16).astype(np.float32) / 32768.0
+    result = session.transcribe_samples(samples, offset=0.0)
+    if progress:
+        progress(0.74, f"Wav2Vec2 finished: {len(result['segments'])} segments.")
+    if not result["segments"] and sample_count:
+        result["segments"] = [{"start": 0.0, "end": sample_count / 16000.0, "text": "No speech detected."}]
+    result["language"] = language or "en"
+    return result
+
+
+__all__ = [
+    "WAV2VEC2_MODEL_LABELS",
+    "WAV2VEC2_MODEL_SPECS",
+    "Wav2Vec2Session",
+    "load_wav2vec2_session",
+    "model_spec",
+    "transcribe_wav2vec_audio",
+]

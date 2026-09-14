@@ -1,0 +1,15 @@
+.venv/
+.uv-python/
+.uv-cache/
+.cache/
+temp/
+__pycache__/
+*.pyc
+.pytest_cache/
+test_output/
+.external-cache/
+.venv-repair-backup-*/
+dist/
+/*.exe
+*.zip
+Transcripts/*.txt

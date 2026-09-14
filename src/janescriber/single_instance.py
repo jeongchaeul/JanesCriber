@@ -1,0 +1,47 @@
+"""Prevent multiple JanesCriber GUI processes from competing for hardware."""
+
+from __future__ import annotations
+
+import atexit
+import os
+
+
+_mutex_handle = None
+
+
+def acquire_gui_instance(name: str = "JanesCriber.GUI") -> bool:
+    """Acquire a per-user Windows mutex, returning False when already running."""
+    global _mutex_handle
+    if os.name != "nt":
+        return True
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
+        kernel32.CreateMutexW.restype = ctypes.c_void_p
+        kernel32.GetLastError.restype = ctypes.c_uint32
+        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+        handle = kernel32.CreateMutexW(None, False, name)
+        if not handle:
+            return True
+        if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+            kernel32.CloseHandle(handle)
+            return False
+        _mutex_handle = handle
+        atexit.register(_release_mutex)
+        return True
+    except (AttributeError, OSError):
+        return True
+
+
+def _release_mutex() -> None:
+    global _mutex_handle
+    if _mutex_handle:
+        try:
+            import ctypes
+
+            ctypes.windll.kernel32.CloseHandle(_mutex_handle)
+        except (AttributeError, OSError):
+            pass
+        _mutex_handle = None
