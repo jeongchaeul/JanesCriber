@@ -20,6 +20,7 @@ def configure_runtime(base_dir: str | Path, *, create_directories: bool = True) 
         "model_cache": base / ".cache" / "whisper",
         "vosk_model_cache": base / ".cache" / "vosk",
         "wav2vec_model_cache": base / ".cache" / "wav2vec2",
+        "qwen_model_cache": base / ".cache" / "qwen3-asr",
         "transcript_cache": base / ".cache" / "transcripts",
         "logs": base / ".cache" / "logs",
     }

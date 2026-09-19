@@ -23,9 +23,9 @@ meetings, calls, interviews, lectures, videos, and everyday conversations.
 
 - **Audio and video files** — Open any format that the bundled FFmpeg build can
   read, including MP3, WAV, M4A, FLAC, AAC, OGG, MP4, MKV, MOV, and WEBM.
-- **Three local ASR engines** — Choose between Whisper, Vosk/Kaldi, and
-  Wav2Vec2 depending on your priorities for accuracy, speed, language coverage,
-  and memory use.
+- **Four local ASR engines** — Choose between Whisper, Qwen3-ASR, Vosk/Kaldi,
+  and Wav2Vec2 depending on your priorities for accuracy, speed, language
+  coverage, and memory use.
 - **Live transcription** — Capture a microphone, system output, or a visible
   application window while it is happening.
 - **GPU acceleration when available** — NVIDIA CUDA/FP16 and Apple MPS are
@@ -60,6 +60,7 @@ Each completed file is written as UTF-8 text in the `Transcripts` folder.
 | Engine | Best for | Languages | Acceleration | Live capture |
 | --- | --- | --- | --- | --- |
 | **Whisper (OpenAI)** | Highest-quality general transcription and multilingual audio | Broad multilingual catalog | NVIDIA CUDA/FP16, Apple MPS, or CPU | Yes |
+| **Qwen3-ASR** | Strong independent multilingual recognition, including Filipino/Tagalog | 30 languages and dialects | NVIDIA CUDA/FP16, Apple MPS, or CPU | File transcription |
 | **Vosk / Kaldi** | Lightweight, offline transcription and long live sessions | One downloaded language model at a time | CPU in the standard Vosk package | Yes |
 | **Wav2Vec2** | An independent local English-focused model with optional CUDA | English-focused | NVIDIA CUDA when available, otherwise CPU | Yes |
 
@@ -90,6 +91,31 @@ is licensed under Apache-2.0.
 See the [Wav2Vec2 model card](https://huggingface.co/facebook/wav2vec2-base-960h)
 for its model details and limitations.
 
+### Qwen3-ASR
+
+Qwen3-ASR is an independent open-weight ASR family. It is the strongest
+additional multilingual option in JanesCriber and includes Filipino/Tagalog,
+along with 29 other released languages. The 0.6B model is the sensible
+starting point; the 1.7B model can improve difficult recordings but needs more
+RAM and GPU memory. Its current JanesCriber integration uses bounded 30-second
+timestamp blocks. Choose Whisper when exact word-level timestamps or live
+capture are more important than Qwen's multilingual recognition.
+
+Qwen3-ASR is optional because its official package adds a sizeable dependency
+set. Source users can enable it with:
+
+```powershell
+.\install.ps1 -WithQwen
+```
+
+The same optional install is available from the batch launcher with
+`setup.bat qwen`.
+
+The model weights are still downloaded only when Qwen3-ASR is selected and are
+stored in `.cache\qwen3-asr` beside the program. The [Qwen3-ASR model card](https://huggingface.co/Qwen/Qwen3-ASR-0.6B)
+documents its languages, local inference package, GPU usage, and timestamp
+aligner limitations.
+
 ## Live transcription
 
 Open **Live Transcription** to document speech as it happens. Select a capture
@@ -113,6 +139,8 @@ application can remain quiet until that application begins playing audio.
   maximum recognition quality.
 - Use **Wav2Vec2** for an independent local English option when CUDA is
   available; its live mode uses short rolling recognition windows.
+- Use **Qwen3-ASR** for difficult multilingual file recordings, especially
+  Filipino/Tagalog. It is not currently a live-session engine in JanesCriber.
 - Avoid **Whisper `small`, `turbo`, or `large-v3`** for long live sessions on
   machines with limited RAM. These models can take substantially longer to load
   and may make the interface less responsive.
@@ -122,6 +150,20 @@ application can remain quiet until that application begins playing audio.
 
 Live transcripts are saved into `Transcripts` and appear in **Transcript
 Library** after they are finalized.
+
+## JanesCriber Studio
+
+The repository now includes a separate native desktop surface under
+desktop-ui/. JanesCriber Studio uses Tauri 2, React, TypeScript, Tailwind CSS,
+and Motion for a quieter, lighter interface inspired by the Janes Cerys
+portfolio and JaneClipper family programs. The existing Python launcher remains
+available as a fallback.
+
+The Studio exposes the same local engine through a supervised JSON bridge:
+transcription, Qwen3-ASR, Vosk, Wav2Vec2, searchable multi-language selection,
+drag-and-drop input, live capture, the transcript library, hardware telemetry,
+pipeline stages, and console logs all remain available without duplicating ASR
+logic in the frontend.
 
 ## Where JanesCriber stores data
 
@@ -136,7 +178,9 @@ JanesCriber/
 │  ├─ vosk/                     Downloaded Vosk/Kaldi models
 │  ├─ wav2vec2/                 Downloaded Wav2Vec2 models
 │  └─ transcripts/              Validated transcript cache
-└─ temp/                        Short-lived normalized audio files
+├─ temp/                        Short-lived normalized audio files
+├─ artifacts/                   Ignored release/build staging
+└─ desktop-ui/                 Tauri + React source for JanesCriber Studio
 ```
 
 The application does not intentionally place transcript output in the Windows
@@ -194,8 +238,10 @@ Launch the desktop application with:
 uv run python -m janescriber --gui
 ```
 
-The first use of Whisper, Vosk, or Wav2Vec2 downloads the selected model into
-the corresponding project-local cache.
+The first use of Whisper, Vosk, Wav2Vec2, or Qwen3-ASR downloads the selected
+model into the corresponding project-local cache. Qwen3-ASR is opt-in because
+its supporting Python package is larger than the built-in engines; enable it
+with `.\install.ps1 -WithQwen` before selecting it.
 
 ## Command-line use
 
@@ -221,14 +267,16 @@ After completing source setup, build the Windows bundle with:
 .\build_release.ps1
 ```
 
-The output is placed in `dist\`. The build script creates the portable folder,
+The output is placed in artifacts\releases\ and artifacts\build\. The build script creates the portable folder,
 copies the required runtime assets, verifies important bundled components, and
 can create a release ZIP. The executable is unsigned by default; provide a code
 signing certificate to the build script when preparing a trusted public release.
 
-Wav2Vec2 model weights are intentionally downloaded on demand rather than
-bundled into the executable, keeping the release smaller and allowing users to
-choose whether they need that engine.
+Wav2Vec2 and Qwen3-ASR model weights are intentionally downloaded on demand
+rather than bundled into the executable, keeping the release smaller and
+allowing users to choose whether they need those engines. A portable build
+includes Qwen3-ASR only when it is built from an environment where the optional
+Qwen package has been installed.
 
 ## Privacy and network behavior
 

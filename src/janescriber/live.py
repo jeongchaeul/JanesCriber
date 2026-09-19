@@ -24,6 +24,7 @@ from .model_manager import ensure_model_downloaded, load_whisper_model
 from .pipeline_config import SUPPORTED_ENGINES, SUPPORTED_MODELS
 from .vosk_backend import VOSK_MODEL_SPECS, default_model_for_language, ensure_vosk_model
 from .wav2vec_backend import WAV2VEC2_MODEL_SPECS, load_wav2vec2_session
+from .qwen_backend import QWEN_MODEL_SPECS
 
 
 class _NullWriter:
@@ -83,7 +84,7 @@ class LiveTranscriptionConfig:
                 )
             if not languages:
                 languages = (VOSK_MODEL_SPECS[model].language,)
-        else:
+        elif engine == "wav2vec2":
             if model in {"", "auto", "turbo"}:
                 model = "wav2vec2-base-960h"
             if model not in WAV2VEC2_MODEL_SPECS:
@@ -91,6 +92,8 @@ class LiveTranscriptionConfig:
             if languages and languages != ("en",):
                 raise ValueError("Wav2Vec2 currently supports English only. Choose English or use Whisper/Vosk.")
             languages = ("en",)
+        else:
+            raise ValueError("Qwen3-ASR is currently available for file transcription only. Use Whisper, Vosk, or Wav2Vec2 for live sessions.")
         object.__setattr__(self, "model_name", model)
         if self.sample_rate < 8000:
             raise ValueError("Live capture sample rate is too low.")
@@ -852,6 +855,9 @@ def _run_live_process(
             on_error=lambda error: emit("error", str(error)),
         )
         session.start()
+        # Publish the output path before model loading completes so the parent
+        # can surface a partial transcript after a forced stop.
+        emit("started", str(session.output_path) if session.output_path else "")
         while session.is_running:
             if cancel.is_set():
                 session.stop(timeout=2.0)
@@ -927,16 +933,18 @@ class LiveProcessController:
         if self._monitor and self._monitor.is_alive() and threading.current_thread() is not self._monitor:
             self._monitor.join(timeout=1.0)
         if not self._terminal:
-            self._finish(None)
+            partial = self.output_path if self.output_path and self.output_path.is_file() else None
+            self._finish(partial)
 
     def _finish(self, path: Path | None) -> None:
         with self._lock:
             if self._terminal:
                 return
             self._terminal = True
-            self.output_path = path
+            resolved_path = path or self.output_path
+            self.output_path = resolved_path
         if self.on_finished:
-            self.on_finished(path)
+            self.on_finished(resolved_path)
 
     def _fail(self, message: str) -> None:
         with self._lock:
@@ -952,6 +960,9 @@ class LiveProcessController:
         kind, value = event[0], event[1] if len(event) > 1 else ""
         if kind == "status" and self.on_status:
             self.on_status(str(value))
+        elif kind == "started":
+            if value:
+                self.output_path = Path(str(value))
         elif kind == "text" and self.on_text:
             self.on_text(str(value), [])
         elif kind == "finished":

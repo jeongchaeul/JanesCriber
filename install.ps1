@@ -1,3 +1,6 @@
+param(
+    [switch]$WithQwen
+)
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 Set-Location $scriptDir
@@ -59,7 +62,7 @@ Write-Host "Using Python $pythonVersion at $pythonExecutable" -ForegroundColor C
 
 # Keep uv's wheel cache beside the project so setup does not silently consume
 # the system drive. The virtual environment and Whisper models are local too.
-$env:UV_CACHE_DIR = Join-Path $scriptDir ".uv-cache"
+$env:UV_CACHE_DIR = Join-Path $scriptDir ".cache\uv-cache"
 $torchExtra = if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) { "cuda" } else { "cpu" }
 Write-Host "Hardware profile: Windows $torchExtra runtime" -ForegroundColor Cyan
 
@@ -75,6 +78,15 @@ Write-Host "Installing the selected Torch runtime ($torchVersion)..." -Foregroun
 # PyTorch index while its ordinary Python dependencies come from PyPI.
 & uv pip install --python $pythonInEnvironment "torch==$torchVersion" --index-url $torchIndex --extra-index-url "https://pypi.org/simple" --index-strategy unsafe-best-match
 if ($LASTEXITCODE -ne 0) { throw "Torch runtime installation failed with exit code $LASTEXITCODE." }
+
+if ($WithQwen) {
+    Write-Host "Installing the optional Qwen3-ASR local model pack..." -ForegroundColor Yellow
+    & uv pip install --python $pythonInEnvironment "qwen-asr==0.0.6" --index-url "https://pypi.org/simple"
+    if ($LASTEXITCODE -ne 0) { throw "Qwen3-ASR installation failed with exit code $LASTEXITCODE." }
+    Write-Host "Installing the matching TorchVision audio utility runtime ($torchExtra)..." -ForegroundColor Yellow
+    & uv pip install --python $pythonInEnvironment "torchvision==0.22.1" --index-url $torchIndex --extra-index-url "https://pypi.org/simple" --index-strategy unsafe-best-match
+    if ($LASTEXITCODE -ne 0) { throw "TorchVision installation failed with exit code $LASTEXITCODE." }
+}
 
 $cscCandidates = @(
     "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe",
@@ -92,6 +104,11 @@ if ($csc) {
 
 Write-Host "" 
 Write-Host "Setup complete. Models and scratch data remain in this project folder." -ForegroundColor Green
+if ($WithQwen) {
+    Write-Host "Qwen3-ASR is enabled. Its model weights download only when selected and remain in .cache\qwen3-asr." -ForegroundColor Green
+} else {
+    Write-Host "Qwen3-ASR is available as an optional model pack: install.ps1 -WithQwen" -ForegroundColor Gray
+}
 if (Test-Path -LiteralPath "$scriptDir\JanesCriber.exe") {
     Start-Process -FilePath "$scriptDir\JanesCriber.exe" -WorkingDirectory $scriptDir
 }

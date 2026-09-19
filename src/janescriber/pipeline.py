@@ -25,6 +25,7 @@ from .paths import output_path_for
 from .pipeline_config import TranscriptionConfig, validate_transcription_request
 from .vosk_backend import transcribe_vosk_audio
 from .wav2vec_backend import transcribe_wav2vec_audio
+from .qwen_backend import transcribe_qwen_audio
 
 Progress = Callable[[float, str], None]
 
@@ -155,6 +156,7 @@ def transcribe_audio(
     engine: str = "whisper",
     vosk_model_cache: str | Path | None = None,
     wav2vec_model_cache: str | Path | None = None,
+    qwen_model_cache: str | Path | None = None,
 ) -> dict[str, Any]:
     """Transcribe one normalized WAV through the selected local ASR engine."""
     check_cancelled(cancel)
@@ -181,6 +183,21 @@ def transcribe_audio(
             model_id=config.model_name,
             model_cache=wav2vec_model_cache,
             language=config.language_arg or "en",
+            device=str(hardware["device"]),
+            progress=progress,
+            cancel=cancel,
+        )
+    if engine == "qwen3-asr":
+        if qwen_model_cache is None:
+            raise RuntimeError("A project-local Qwen3-ASR model cache is required.")
+        config = TranscriptionConfig(engine="qwen3-asr", model_name=model_name, language=language)
+        hardware = detect_hardware()
+        _report(progress, 0.32, f"Preparing Qwen3-ASR {config.model_name} on {hardware['accelerator']}...")
+        return transcribe_qwen_audio(
+            audio_path,
+            model_id=config.model_name,
+            model_cache=qwen_model_cache,
+            language=config.language_arg,
             device=str(hardware["device"]),
             progress=progress,
             cancel=cancel,
@@ -327,6 +344,7 @@ def transcribe_media(
                 model_cache=paths["model_cache"],
                 vosk_model_cache=paths["vosk_model_cache"],
                 wav2vec_model_cache=paths["wav2vec_model_cache"],
+                qwen_model_cache=paths["qwen_model_cache"],
                 language=config.language_arg,
                 progress=progress,
                 cancel=cancel,

@@ -35,6 +35,7 @@ WAV2VEC2_MODEL_SPECS: dict[str, Wav2VecModelSpec] = {
     ),
 }
 WAV2VEC2_MODEL_LABELS = {key: spec.label for key, spec in WAV2VEC2_MODEL_SPECS.items()}
+_FILE_CHUNK_SECONDS = 30.0
 
 
 def model_spec(model_id: str) -> Wav2VecModelSpec:
@@ -179,21 +180,44 @@ def transcribe_wav2vec_audio(
 ) -> dict[str, Any]:
     """Transcribe a normalized 16 kHz mono WAV with local Wav2Vec2."""
     session = load_wav2vec2_session(model_id, model_cache, device, progress, cancel)
-    values: bytes
+    segments: list[dict[str, Any]] = []
+    words: list[dict[str, Any]] = []
+    sample_count = 0
     with wave.open(str(audio_path), "rb") as audio:
         if audio.getnchannels() != 1 or audio.getsampwidth() != 2 or audio.getframerate() != 16000:
             raise RuntimeError("Wav2Vec2 requires normalized 16 kHz mono 16-bit audio.")
-        frames = audio.readframes(audio.getnframes())
-        values = frames
-        sample_count = len(frames) // 2
-    import numpy as np
-    samples = np.frombuffer(values, dtype=np.int16).astype(np.float32) / 32768.0
-    result = session.transcribe_samples(samples, offset=0.0)
+        total_frames = audio.getnframes()
+        chunk_frames = max(1, round(_FILE_CHUNK_SECONDS * audio.getframerate()))
+        import numpy as np
+
+        while sample_count < total_frames:
+            check_cancelled(cancel)
+            frames = audio.readframes(min(chunk_frames, total_frames - sample_count))
+            if not frames:
+                break
+            samples = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+            result = session.transcribe_samples(
+                samples,
+                sample_rate=audio.getframerate(),
+                offset=sample_count / audio.getframerate(),
+            )
+            segments.extend(result.get("segments", []))
+            words.extend(result.get("words", []))
+            sample_count += len(samples)
+            if progress:
+                fraction = sample_count / max(1, total_frames)
+                progress(0.50 + min(0.24, 0.24 * fraction), f"Wav2Vec2 transcribing: {sample_count / audio.getframerate():.1f}s / {total_frames / audio.getframerate():.1f}s")
+
+    result = {
+        "text": " ".join(str(segment.get("text", "")).strip() for segment in segments if segment.get("text")),
+        "segments": segments,
+        "words": words,
+        "language": language or "en",
+    }
     if progress:
         progress(0.74, f"Wav2Vec2 finished: {len(result['segments'])} segments.")
     if not result["segments"] and sample_count:
         result["segments"] = [{"start": 0.0, "end": sample_count / 16000.0, "text": "No speech detected."}]
-    result["language"] = language or "en"
     return result
 
 

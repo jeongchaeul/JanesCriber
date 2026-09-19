@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "JanesCriber Studio",
+  "version": "0.1.0",
+  "identifier": "com.projectaspyr.janescriber.studio",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://127.0.0.1:1421",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "JanesCriber Studio",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1080,
+        "minHeight": 700,
+        "decorations": true,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "capabilities": ["main-capability"]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["../../assets/icon.ico"],
+    "resources": ["../../artifacts/build/portable-dist/JanesCriber/**/*"]
+  }
+}

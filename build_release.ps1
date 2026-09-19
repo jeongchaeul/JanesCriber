@@ -15,10 +15,18 @@ $python = Join-Path $scriptDir ".venv\Scripts\python.exe"
 if (-not (Test-Path -LiteralPath $python)) {
     throw "The project environment is missing. Run setup.bat before building the release."
 }
-$staging = Join-Path $scriptDir "dist\JanesCriber-$Version"
-$archive = Join-Path $scriptDir "dist\JanesCriber-$Version-windows.zip"
-$portableDist = Join-Path $scriptDir "dist\portable-dist"
-$pyinstallerWork = Join-Path $scriptDir "temp\pyinstaller-build"
+$artifactRoot = Join-Path $scriptDir "artifacts"
+$staging = Join-Path $artifactRoot "releases\JanesCriber-$Version"
+$archive = Join-Path $artifactRoot "releases\JanesCriber-$Version-windows.zip"
+$portableDist = Join-Path $artifactRoot "build\portable-dist"
+$pyinstallerWork = Join-Path $artifactRoot "build\pyinstaller-build"
+$specRoot = Join-Path $artifactRoot "build"
+$qwenInstalled = Test-Path -LiteralPath (Join-Path $scriptDir ".venv\Lib\site-packages\qwen_asr")
+$qwenPyInstallerArgs = @()
+if ($qwenInstalled) {
+    $qwenPyInstallerArgs = @("--collect-all", "qwen_asr", "--collect-all", "qwen_omni_utils")
+}
+New-Item -ItemType Directory -Path (Join-Path $artifactRoot "releases"), (Join-Path $artifactRoot "build") -Force | Out-Null
 foreach ($path in @($staging, $portableDist, $pyinstallerWork)) {
     if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force }
 }
@@ -37,15 +45,23 @@ Write-Host "Building the self-contained JanesCriber runtime..." -ForegroundColor
     --collect-all vosk `
     --hidden-import transformers `
     --collect-submodules transformers.models.wav2vec2 `
+    @qwenPyInstallerArgs `
     --distpath $portableDist `
     --workpath $pyinstallerWork `
-    --specpath (Join-Path $scriptDir "temp") `
+    --specpath $specRoot `
     (Join-Path $scriptDir "src\janescriber\__main__.py")
 if ($LASTEXITCODE -ne 0) { throw "Portable runtime build failed with exit code $LASTEXITCODE." }
 
 $portableApp = Join-Path $portableDist "JanesCriber"
 if (-not (Test-Path -LiteralPath (Join-Path $portableApp "JanesCriber.exe"))) {
     throw "PyInstaller completed without producing JanesCriber.exe."
+}
+$studioExecutable = Join-Path $scriptDir "desktop-ui\src-tauri\target\release\janescriber-studio.exe"
+if (Test-Path -LiteralPath $studioExecutable) {
+    Copy-Item -LiteralPath $studioExecutable -Destination (Join-Path $portableApp "JanesCriberStudio.exe") -Force
+    Write-Host "Included JanesCriber Studio beside the legacy Python launcher." -ForegroundColor Green
+} else {
+    Write-Warning "JanesCriber Studio was not found. The portable package will contain the legacy Python interface only."
 }
 Copy-Item -Path (Join-Path $portableApp "*") -Destination $staging -Recurse -Force
 foreach ($file in @("README.md", "ARCHITECTURE.md")) {
@@ -98,7 +114,7 @@ import sys
 import zipfile
 
 root, destination = sys.argv[1], sys.argv[2]
-with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6, allowZip64=True) as bundle:
+with zipfile.ZipFile(destination, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6, allowZip64=True) as bundle:
     for folder, _, filenames in os.walk(root):
         for filename in filenames:
             path = os.path.join(folder, filename)

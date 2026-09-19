@@ -1,0 +1,128 @@
+@import "tailwindcss";
+
+:root {
+  color: #e9e7ef;
+  background: #06060d;
+  font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --bg: #06060d;
+  --surface: #0c0c17;
+  --surface-raised: #11111e;
+  --surface-input: #080811;
+  --line: rgba(160, 155, 196, 0.18);
+  --line-strong: rgba(160, 155, 196, 0.3);
+  --text: #eeecf4;
+  --muted: #9895aa;
+  --faint: #656276;
+  --pink: #d94f8c;
+  --pink-soft: rgba(217, 79, 140, 0.15);
+  --cyan: #62b8e8;
+  --yellow: #e7c35b;
+  --green: #5bd3a7;
+  --red: #e97686;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { min-width: 1040px; min-height: 100vh; margin: 0; }
+body { overflow: hidden; background: var(--bg); color: var(--text); }
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .46; }
+::selection { background: rgba(217, 79, 140, .28); color: white; }
+
+.shell-bg {
+  background:
+    radial-gradient(circle at 92% -10%, rgba(83, 111, 190, .12), transparent 33%),
+    radial-gradient(circle at 0% 100%, rgba(217, 79, 140, .05), transparent 30%),
+    linear-gradient(135deg, #06060d 0%, #080813 55%, #06060d 100%);
+}
+
+.panel {
+  border: 1px solid var(--line);
+  background: rgba(12, 12, 23, .86);
+  border-radius: 14px;
+}
+
+.panel-raised {
+  border: 1px solid var(--line);
+  background: rgba(17, 17, 30, .8);
+  border-radius: 11px;
+}
+
+.field {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-input);
+  color: var(--text);
+  outline: none;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.field:focus { border-color: rgba(98, 184, 232, .7); background: #0a0a15; }
+.field::placeholder { color: var(--faint); }
+
+.subtle-button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(17, 17, 30, .7);
+  color: #c9c6d7;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.subtle-button:hover:not(:disabled) { border-color: var(--line-strong); background: #171724; color: white; }
+.accent-button {
+  border: 1px solid rgba(217, 79, 140, .45);
+  border-radius: 8px;
+  background: rgba(217, 79, 140, .18);
+  color: #f2c3d8;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.accent-button:hover:not(:disabled) { border-color: rgba(217, 79, 140, .75); background: rgba(217, 79, 140, .27); }
+.accent-button:active:not(:disabled) { transform: translateY(1px); }
+
+.muted-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(159, 155, 185, .52) transparent;
+  overscroll-behavior: contain;
+}
+.muted-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.muted-scroll::-webkit-scrollbar-track { background: transparent; }
+.muted-scroll::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 999px; background-clip: padding-box; background-color: rgba(159, 155, 185, .52); }
+.muted-scroll::-webkit-scrollbar-thumb:hover { background-color: rgba(98, 184, 232, .7); }
+
+.progress-track { overflow: hidden; border-radius: 999px; background: #06060d; }
+.progress-fill { background: linear-gradient(90deg, rgba(217, 79, 140, .55), rgba(98, 184, 232, .82)); }
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--pink);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.page-title {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(24px, 2.4vw, 32px);
+  font-weight: 650;
+  letter-spacing: -.03em;
+}
+
+.page-subtitle { margin: 9px 0 0; max-width: 700px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.section-title { margin: 0; color: white; font-size: 14px; font-weight: 650; }
+.hint { margin: 6px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.field-label { display: block; color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: .02em; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+}

@@ -115,3 +115,8 @@ def test_live_wav2vec_config_is_english_and_gpu_capable():
 def test_live_wav2vec_config_rejects_non_english():
     with pytest.raises(ValueError, match="English only"):
         LiveTranscriptionConfig(engine="wav2vec2", model_name="auto", language=("tl",))
+
+
+def test_live_qwen_config_is_rejected_until_streaming_backend_is_available():
+    with pytest.raises(ValueError, match="file transcription only"):
+        LiveTranscriptionConfig(engine="qwen3-asr", model_name="auto", language=("tl",))

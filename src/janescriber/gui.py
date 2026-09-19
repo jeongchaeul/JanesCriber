@@ -7,6 +7,7 @@ import multiprocessing
 import queue
 import re
 import sys
+import subprocess
 import threading
 import time
 import tkinter as tk
@@ -33,9 +34,11 @@ from .live import (
     list_system_output_sources,
 )
 from .paths import project_dir, resource_dir, runtime_paths
+from .launcher import FRONTEND_MAIN, FRONTEND_PYTHON, relaunch_command, write_frontend_preference
 from .pipeline import run_transcription_job
 from .vosk_backend import VOSK_LANGUAGE_TO_MODEL, VOSK_MODEL_LABELS, default_model_for_language
 from .wav2vec_backend import WAV2VEC2_MODEL_LABELS
+from .qwen_backend import QWEN_MODEL_LABELS
 
 
 THEME = {
@@ -55,7 +58,7 @@ THEME = {
     "yellow": "#facc15",
 }
 
-ASR_ENGINE_OPTIONS = ["Whisper (OpenAI)", "Vosk / Kaldi (local)", "Wav2Vec2 (GPU-capable)"]
+ASR_ENGINE_OPTIONS = ["Whisper (OpenAI)", "Qwen3-ASR (multilingual)", "Vosk / Kaldi (local)", "Wav2Vec2 (GPU-capable)"]
 WHISPER_MODEL_OPTIONS = ["turbo", "large-v3", "medium", "small", "base", "tiny"]
 
 
@@ -197,6 +200,17 @@ class JanesCriberApp(ctk.CTk):
         self.sidebar_engine_heading.pack(anchor="w", padx=20)
         self.sidebar_engine_description = ctk.CTkLabel(self.sidebar, text="Whisper runs on your machine.\nModels, cache and scratch files\nstay in the project folder.", justify="left", text_color=THEME["muted"], font=ctk.CTkFont(size=11), wraplength=190)
         self.sidebar_engine_description.pack(anchor="w", padx=20, pady=(6, 0))
+        self.interface_controls = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.interface_controls.pack(side="bottom", fill="x", padx=12, pady=(0, 8))
+        ctk.CTkFrame(self.interface_controls, height=1, fg_color=THEME["border"]).pack(fill="x", padx=6, pady=(0, 8))
+        self.interface_heading = ctk.CTkLabel(self.interface_controls, text="INTERFACE", text_color=THEME["muted"], font=ctk.CTkFont(size=10, weight="bold"))
+        self.interface_heading.pack(anchor="w", padx=8, pady=(0, 5))
+        self.main_interface_btn = ctk.CTkButton(self.interface_controls, text="▣  Use Main UI Next Launch", anchor="w", height=28, corner_radius=7, fg_color=THEME["inner"], hover_color=THEME["glow"], border_width=1, border_color=THEME["border"], text_color=THEME["text"], font=ctk.CTkFont(size=10, weight="bold"), command=lambda: self._set_interface_preference(FRONTEND_MAIN, "Main UI"))
+        self.main_interface_btn.pack(fill="x", pady=(0, 4))
+        self.legacy_interface_btn = ctk.CTkButton(self.interface_controls, text="▤  Use Legacy Python Next Launch", anchor="w", height=28, corner_radius=7, fg_color=THEME["inner"], hover_color=THEME["glow"], border_width=1, border_color=THEME["border"], text_color=THEME["text"], font=ctk.CTkFont(size=10, weight="bold"), command=lambda: self._set_interface_preference(FRONTEND_PYTHON, "Legacy Python UI"))
+        self.legacy_interface_btn.pack(fill="x", pady=(0, 4))
+        self.relaunch_btn = ctk.CTkButton(self.interface_controls, text="↻  Relaunch JanesCriber", anchor="w", height=28, corner_radius=7, fg_color=THEME["inner"], hover_color=THEME["glow"], border_width=1, border_color=THEME["border"], text_color=THEME["text"], font=ctk.CTkFont(size=10, weight="bold"), command=self._relaunch)
+        self.relaunch_btn.pack(fill="x")
         self.sidebar_status = ctk.CTkLabel(self.sidebar, text="● READY", text_color=THEME["success"], font=ctk.CTkFont(size=11, weight="bold"))
         self.sidebar_status.pack(side="bottom", anchor="w", padx=20, pady=24)
 
@@ -233,6 +247,11 @@ class JanesCriberApp(ctk.CTk):
             self.sidebar_divider.pack_forget()
             self.sidebar_engine_heading.pack_forget()
             self.sidebar_engine_description.pack_forget()
+            self.interface_heading.configure(text="")
+            self.interface_controls.pack_configure(padx=8)
+            self.main_interface_btn.configure(text="M", width=32, anchor="center")
+            self.legacy_interface_btn.configure(text="P", width=32, anchor="center")
+            self.relaunch_btn.configure(text="↻", width=32, anchor="center")
             self.sidebar_status.configure(text="●", anchor="center")
             self.sidebar_status.pack_configure(anchor="center", padx=0)
             try:
@@ -245,6 +264,11 @@ class JanesCriberApp(ctk.CTk):
             self.sidebar_divider.pack(fill="x", padx=18, pady=18)
             self.sidebar_engine_heading.pack(anchor="w", padx=20)
             self.sidebar_engine_description.pack(anchor="w", padx=20, pady=(6, 0))
+            self.interface_heading.configure(text="INTERFACE")
+            self.interface_controls.pack_configure(padx=12)
+            self.main_interface_btn.configure(text="▣  Use Main UI Next Launch", width=0, anchor="w")
+            self.legacy_interface_btn.configure(text="▤  Use Legacy Python Next Launch", width=0, anchor="w")
+            self.relaunch_btn.configure(text="↻  Relaunch JanesCriber", width=0, anchor="w")
             self.sidebar_status.configure(text="● READY", anchor="w")
             self.sidebar_status.pack_configure(anchor="w", padx=20)
             try:
@@ -254,6 +278,34 @@ class JanesCriberApp(ctk.CTk):
         for key, button in self.nav_buttons.items():
             button.configure(text=self.sidebar_tab_icons[key] if compact else dict((k, v) for k, v in (("studio", "◉  Transcription Studio"), ("live", "◌  Live Transcription"), ("library", "▣  Transcript Library"), ("hardware", "▦  Hardware & Pipeline"), ("console", "▤  Console Logs")))[key], anchor="center" if compact else "w")
             button.pack_configure(padx=10 if not compact else 8)
+
+    def _set_interface_preference(self, preference: str, label: str) -> None:
+        try:
+            write_frontend_preference(preference, self.paths["base"])
+            self.sidebar_status.configure(text=f"● {label.upper()} NEXT LAUNCH", text_color=THEME["yellow"])
+            messagebox.showinfo("Interface Preference", f"{label} will open the next time JanesCriber starts.")
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("Interface Preference", f"Could not save the interface preference.\n\n{exc}")
+
+    def _relaunch(self) -> None:
+        if self.is_processing or (self.live_session and self.live_session.is_running):
+            messagebox.showwarning("Transcription in Progress", "Stop the current transcription or live session before relaunching JanesCriber.")
+            return
+        environment = os.environ.copy()
+        environment["JANESCRIBER_DATA_DIR"] = str(self.paths["base"])
+        launch_kwargs: dict[str, object] = {
+            "cwd": str(self.paths["base"]),
+            "env": environment,
+            "close_fds": os.name != "nt",
+        }
+        if os.name == "nt":
+            launch_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        try:
+            subprocess.Popen(relaunch_command(self.paths["base"]), **launch_kwargs)
+        except OSError as exc:
+            messagebox.showerror("Relaunch failed", f"JanesCriber could not be relaunched.\n\n{exc}")
+            return
+        self.destroy()
 
     def _card(self, parent, title, subtitle=""):
         card = ctk.CTkFrame(parent, fg_color=THEME["card"], border_width=1, border_color=THEME["border"], corner_radius=10)
@@ -269,6 +321,8 @@ class JanesCriberApp(ctk.CTk):
             return "vosk"
         if value.startswith("Wav2Vec2"):
             return "wav2vec2"
+        if value.startswith("Qwen3"):
+            return "qwen3-asr"
         return "whisper"
 
     @staticmethod
@@ -278,6 +332,9 @@ class JanesCriberApp(ctk.CTk):
             if value == label:
                 return model_id
         for model_id, label in WAV2VEC2_MODEL_LABELS.items():
+            if value == label:
+                return model_id
+        for model_id, label in QWEN_MODEL_LABELS.items():
             if value == label:
                 return model_id
         return value
@@ -293,6 +350,11 @@ class JanesCriberApp(ctk.CTk):
             model_id = default if default in WAV2VEC2_MODEL_LABELS else "wav2vec2-base-960h"
             menu.configure(values=values)
             menu.set(WAV2VEC2_MODEL_LABELS[model_id])
+        elif engine == "qwen3-asr":
+            values = list(QWEN_MODEL_LABELS.values())
+            model_id = default if default in QWEN_MODEL_LABELS else "qwen3-asr-0.6b"
+            menu.configure(values=values)
+            menu.set(QWEN_MODEL_LABELS[model_id])
         else:
             menu.configure(values=WHISPER_MODEL_OPTIONS)
             menu.set(default if default in WHISPER_MODEL_OPTIONS else "turbo")
@@ -312,18 +374,22 @@ class JanesCriberApp(ctk.CTk):
             self._sync_vosk_model_for_language(self.model_menu, self.selected_language_codes)
         elif engine == "wav2vec2":
             self.engine_help.configure(text="Wav2Vec2 is a local GPU-capable English option using the existing Torch runtime. It falls back to CPU.")
+        elif engine == "qwen3-asr":
+            self.engine_help.configure(text="Qwen3-ASR is an optional local multilingual model with Filipino support and GPU acceleration. It uses bounded timestamp blocks; exact word timing remains a Whisper feature.")
         else:
             self.engine_help.configure(text="Whisper runs locally and offers the broadest language coverage and strongest accuracy.")
 
     def _on_live_engine_changed(self, choice: str) -> None:
         engine = self._engine_id(self.live_engine_menu)
-        default = "tiny" if engine == "whisper" else ("en-us-small" if engine == "vosk" else "wav2vec2-base-960h")
+        default = "tiny" if engine == "whisper" else ("qwen3-asr-0.6b" if engine == "qwen3-asr" else ("en-us-small" if engine == "vosk" else "wav2vec2-base-960h"))
         self._configure_asr_model_menu(self.live_model_menu, engine, default=default)
         if engine == "vosk":
             self.live_engine_help.configure(text="Vosk / Kaldi is a lightweight local backend. It uses one language model at a time.")
             self._sync_vosk_model_for_language(self.live_model_menu, self.selected_language_codes)
         elif engine == "wav2vec2":
             self.live_engine_help.configure(text="Wav2Vec2 is a local GPU-capable English backend. It falls back to CPU when CUDA is unavailable.")
+        elif engine == "qwen3-asr":
+            self.live_engine_help.configure(text="Qwen3-ASR is available for file transcription only. Use Whisper, Vosk, or Wav2Vec2 for live sessions.")
         else:
             self.live_engine_help.configure(text="Whisper provides broader language coverage; Tiny or Base is recommended for long sessions.")
 
@@ -611,6 +677,7 @@ class JanesCriberApp(ctk.CTk):
             self.live_start_button.configure(state="disabled")
             self.live_stop_button.configure(state="normal")
             self.sidebar_status.configure(text="● LISTENING", text_color=THEME["yellow"])
+            self.hw_monitor.set_processing(True)
             self.live_session.start()
         except Exception as exc:
             self._live_failed(exc)
@@ -650,6 +717,7 @@ class JanesCriberApp(ctk.CTk):
     def _live_finished(self, path: Path | None) -> None:
         self.live_start_button.configure(state="normal")
         self.live_stop_button.configure(state="disabled")
+        self.hw_monitor.set_processing(False)
         self.sidebar_status.configure(text="● READY", text_color=THEME["success"])
         if path:
             self._set_live_status(f"Saved live transcript: {path.name}")
@@ -662,9 +730,12 @@ class JanesCriberApp(ctk.CTk):
     def _live_failed(self, error: BaseException) -> None:
         self.live_start_button.configure(state="normal")
         self.live_stop_button.configure(state="disabled")
+        self.hw_monitor.set_processing(False)
         self.sidebar_status.configure(text="● READY", text_color=THEME["success"])
         self._set_live_status(str(error))
         self._log(f"[!] Live transcription: {error}")
+        if self.live_session and self.live_session.output_path and self.live_session.output_path.is_file():
+            self._refresh_library()
 
     def _select_view(self, key: str) -> None:
         for name, button in self.nav_buttons.items():
@@ -1186,7 +1257,8 @@ class JanesCriberApp(ctk.CTk):
             elapsed = max(0, int(time.time() - self.start_processing_time))
             self.hardware_timer_label.configure(text=f"Elapsed: {elapsed // 60:02d}:{elapsed % 60:02d}")
         if hasattr(self, "hardware_status_label"):
-            mode = "Transcription active" if self.is_processing else "Monitoring idle system"
+            live_active = bool(self.live_session and self.live_session.is_running)
+            mode = "Transcription active" if self.is_processing or live_active else "Monitoring idle system"
             self.hardware_status_label.configure(
                 text=f"● {mode} • Last sample: {time.strftime('%H:%M:%S')} • Source: {snapshot.telemetry_source}"
             )

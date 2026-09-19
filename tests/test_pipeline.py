@@ -122,7 +122,10 @@ def test_isolated_worker_can_spawn_and_reuse_cache(tmp_path: Path):
     )
     process.start()
     received = []
-    deadline = time.time() + 20
+    # Windows spawn time varies when the full suite has already imported the
+    # ASR backends. Give the isolated worker a realistic startup budget while
+    # still failing promptly if it genuinely hangs.
+    deadline = time.time() + 45
     try:
         while time.time() < deadline and process.is_alive():
             try:

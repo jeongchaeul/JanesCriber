@@ -12,24 +12,32 @@ from janescriber.paths import project_dir, runtime_paths
 from janescriber.pipeline_config import SUPPORTED_ENGINES, validate_transcription_request
 from janescriber.runtime import configure_runtime
 from janescriber.single_instance import acquire_gui_instance
+from janescriber.launcher import FRONTEND_MAIN, launch_main_ui, read_frontend_preference, find_main_ui
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Transcribe audio and video locally with Whisper or Vosk / Kaldi.")
+    parser = argparse.ArgumentParser(description="Transcribe audio and video locally with Whisper, Qwen3-ASR, Vosk / Kaldi, or Wav2Vec2.")
     parser.add_argument("media", nargs="?", help="Audio or video file to transcribe")
-    parser.add_argument("--engine", default="whisper", choices=SUPPORTED_ENGINES, help="Local ASR backend: whisper or vosk")
+    parser.add_argument("--engine", default="whisper", choices=SUPPORTED_ENGINES, help="Local ASR backend: Whisper, Qwen3-ASR, Vosk / Kaldi, or Wav2Vec2")
     parser.add_argument("--model", default="turbo", help="Model name for the selected engine")
     parser.add_argument("--language", default=None, help="Language code, or omit for auto-detection")
     parser.add_argument("--overwrite", action="store_true", help="Replace an existing transcript in the Transcripts folder")
     parser.add_argument("--no-cache", action="store_true", help="Run the selected engine again even when a cached transcript exists")
     parser.add_argument("--gui", action="store_true", help="Open the desktop console")
+    parser.add_argument("--service", action="store_true", help="Run the JSON-lines bridge used by JanesCriber Studio")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     multiprocessing.freeze_support()
     args = build_parser().parse_args(argv)
+    if args.service:
+        from janescriber.service import run_service
+        return run_service()
     if args.gui or not args.media:
+        if read_frontend_preference() == FRONTEND_MAIN and find_main_ui() is not None:
+            launch_main_ui()
+            return 0
         if not acquire_gui_instance():
             return 0
         configure_runtime(project_dir())

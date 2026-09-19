@@ -22,6 +22,9 @@ from typing import Any
 from .cancellation import CancelCheck, PipelineAborted, check_cancelled
 
 
+_MIN_MODEL_FREE_SPACE = 256 * 1024 * 1024
+
+
 @dataclass(frozen=True)
 class VoskModelSpec:
     """A downloadable Vosk model published by its model maintainer."""
@@ -177,6 +180,13 @@ def ensure_vosk_model(
         with urllib.request.urlopen(request, timeout=30) as response, archive_path.open("wb") as handle:
             total_header = response.headers.get("Content-Length")
             total = int(total_header) if total_header and total_header.isdigit() else 0
+            free_bytes = shutil.disk_usage(cache_dir).free
+            required_bytes = max(_MIN_MODEL_FREE_SPACE, total + _MIN_MODEL_FREE_SPACE)
+            if free_bytes < required_bytes:
+                raise RuntimeError(
+                    f"Not enough free space on {cache_dir.drive or cache_dir.anchor}. "
+                    f"Need about {required_bytes / 1073741824:.1f} GB for the Vosk model download."
+                )
             received = 0
             while True:
                 check_cancelled(cancel)

@@ -7,9 +7,10 @@ from dataclasses import dataclass
 from .languages import normalize_language_codes
 from .vosk_backend import VOSK_MODEL_SPECS, default_model_for_language
 from .wav2vec_backend import WAV2VEC2_MODEL_SPECS
+from .qwen_backend import QWEN_MODEL_SPECS, QWEN_SUPPORTED_CODES
 
 
-SUPPORTED_ENGINES = ("whisper", "vosk", "wav2vec2")
+SUPPORTED_ENGINES = ("whisper", "vosk", "wav2vec2", "qwen3-asr")
 SUPPORTED_MODELS = ("turbo", "large-v3", "medium", "small", "base", "tiny")
 
 
@@ -48,7 +49,7 @@ class TranscriptionConfig:
                 )
             if not languages:
                 languages = (VOSK_MODEL_SPECS[model].language,)
-        else:
+        elif engine == "wav2vec2":
             if model in {"", "auto", "turbo"}:
                 model = "wav2vec2-base-960h"
             if model not in WAV2VEC2_MODEL_SPECS:
@@ -56,6 +57,14 @@ class TranscriptionConfig:
             if languages and languages != ("en",):
                 raise ValueError("Wav2Vec2 currently supports English only. Choose English or use Whisper/Vosk.")
             languages = ("en",)
+        else:
+            if model in {"", "auto", "turbo"}:
+                model = "qwen3-asr-0.6b"
+            if model not in QWEN_MODEL_SPECS:
+                raise ValueError(f"Unsupported Qwen3-ASR model '{self.model_name}'. Choose from: {', '.join(QWEN_MODEL_SPECS)}")
+            unsupported = [code for code in languages if code not in QWEN_SUPPORTED_CODES]
+            if unsupported:
+                raise ValueError(f"Qwen3-ASR does not support language code(s): {', '.join(unsupported)}. Use Whisper for these languages.")
         object.__setattr__(self, "model_name", model)
 
         if len(languages) > 8:
