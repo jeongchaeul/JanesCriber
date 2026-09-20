@@ -1,7 +1,9 @@
 from pathlib import Path
+import queue
 import sys
 import types
 
+import numpy as np
 import pytest
 
 from janescriber.live import (
@@ -42,6 +44,22 @@ def test_live_output_path_stays_in_transcripts_folder(tmp_path: Path):
     live = LiveTranscriber(paths, LiveTranscriptionConfig())
     path = live._next_output_path("2026-09-11 12-00-00")
     assert path.parent == paths["transcripts"]
+
+
+def test_live_capture_reports_audio_dropped_when_queue_is_saturated(tmp_path: Path):
+    paths = configure_runtime(tmp_path)
+    statuses: list[str] = []
+    live = LiveTranscriber(paths, LiveTranscriptionConfig(), on_status=statuses.append)
+    live._audio_queue = queue.Queue(maxsize=1)
+    live._audio_queue.put(np.zeros(4, dtype=np.float32))
+
+    live._enqueue_array(np, np.ones(4, dtype=np.float32), 16000)
+
+    assert live._dropped_audio_chunks == 1
+    assert statuses == [
+        "Live audio buffer is full; dropped 1 audio chunk. Use a smaller live model or shorten the session."
+    ]
+    assert np.array_equal(live._audio_queue.get_nowait(), np.ones(4, dtype=np.float32))
 
 
 def test_live_capture_source_is_preserved_in_rendered_notes(tmp_path: Path):

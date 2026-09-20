@@ -300,6 +300,8 @@ class LiveTranscriber:
         self._stream: Any = None
         self._capture_thread: threading.Thread | None = None
         self._capture_error: BaseException | None = None
+        self._dropped_audio_chunks = 0
+        self._last_backpressure_notice = 0.0
         self._segments: list[LiveSegment] = []
         self._segment_keys: set[tuple[int, int, str]] = set()
         self._output_path: Path | None = None
@@ -321,6 +323,8 @@ class LiveTranscriber:
         self._segments.clear()
         self._segment_keys.clear()
         self._capture_error = None
+        self._dropped_audio_chunks = 0
+        self._last_backpressure_notice = 0.0
         while True:
             try:
                 self._audio_queue.get_nowait()
@@ -719,27 +723,40 @@ class LiveTranscriber:
             target_length = max(1, round(len(samples) * self.config.sample_rate / source_rate))
             positions = np.linspace(0, len(samples) - 1, target_length)
             samples = np.interp(positions, np.arange(len(samples)), samples).astype(np.float32)
-        try:
-            self._audio_queue.put_nowait(samples)
-        except queue.Full:
-            try:
-                self._audio_queue.get_nowait()
-                self._audio_queue.put_nowait(samples)
-            except queue.Empty:
-                pass
+        self._enqueue_chunk(samples)
 
     def _audio_callback(self, indata, frames, time_info, status) -> None:
         if status:
             self._emit_status(f"Audio notice: {status}")
         try:
-            chunk = indata[:, 0].copy()
+            self._enqueue_chunk(indata[:, 0].copy())
+        except (IndexError, TypeError, ValueError) as exc:
+            self._capture_error = exc
+
+    def _enqueue_chunk(self, chunk: Any) -> None:
+        """Keep the capture queue bounded and report when it falls behind."""
+        try:
             self._audio_queue.put_nowait(chunk)
+            return
         except queue.Full:
-            try:
-                self._audio_queue.get_nowait()
-                self._audio_queue.put_nowait(indata[:, 0].copy())
-            except queue.Empty:
-                pass
+            pass
+
+        try:
+            self._audio_queue.get_nowait()
+            self._audio_queue.put_nowait(chunk)
+        except (queue.Empty, queue.Full):
+            return
+
+        self._dropped_audio_chunks += 1
+        now = time.monotonic()
+        if self._dropped_audio_chunks == 1 or now - self._last_backpressure_notice >= 5.0:
+            self._last_backpressure_notice = now
+            count = self._dropped_audio_chunks
+            noun = "chunk" if count == 1 else "chunks"
+            self._emit_status(
+                f"Live audio buffer is full; dropped {count} audio {noun}. "
+                "Use a smaller live model or shorten the session."
+            )
 
     def _recognize(self, model: Any, audio: Any, window_start: float, options: dict[str, Any]) -> None:
         if self._stop_event.is_set():
