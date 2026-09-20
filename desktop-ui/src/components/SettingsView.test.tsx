@@ -8,16 +8,19 @@ describe("SettingsView interface controls", () => {
     const user = userEvent.setup();
     const onSelectInterface = vi.fn();
     const onRelaunch = vi.fn();
+    const onChooseDataDirectory = vi.fn();
 
-    render(<SettingsView onSelectInterface={onSelectInterface} onRelaunch={onRelaunch} />);
+    render(<SettingsView onSelectInterface={onSelectInterface} onRelaunch={onRelaunch} dataDirectory="D:\\JanesCriberData" onChooseDataDirectory={onChooseDataDirectory} />);
 
     expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Use Main UI next launch" }));
     await user.click(screen.getByRole("button", { name: "Use Legacy Python next launch" }));
     await user.click(screen.getByRole("button", { name: "Relaunch JanesCriber" }));
+    await user.click(screen.getByRole("button", { name: "Choose data folder" }));
 
     expect(onSelectInterface).toHaveBeenNthCalledWith(1, "tauri", "Main UI");
     expect(onSelectInterface).toHaveBeenNthCalledWith(2, "python", "Legacy Python UI");
     expect(onRelaunch).toHaveBeenCalledOnce();
+    expect(onChooseDataDirectory).toHaveBeenCalledOnce();
   });
 });

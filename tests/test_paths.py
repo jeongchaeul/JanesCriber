@@ -3,6 +3,14 @@ from pathlib import Path
 from janescriber.paths import output_path_for
 
 
+def test_project_dir_uses_consumer_selected_data_directory(monkeypatch, tmp_path: Path):
+    from janescriber.paths import project_dir
+
+    data_dir = tmp_path / "JanesCriberData"
+    monkeypatch.setenv("JANESCRIBER_DATA_DIR", str(data_dir))
+    assert project_dir() == data_dir.resolve()
+
+
 def test_output_is_next_to_source(tmp_path: Path):
     source = tmp_path / "my recording.m4a"
     source.write_bytes(b"audio")

@@ -44,6 +44,15 @@ export async function chooseMedia(): Promise<string | null> {
   return typeof value === "string" ? value : null;
 }
 
+export async function chooseDataDirectory(): Promise<string | null> {
+  const value = await open({
+    title: "Choose JanesCriber data folder",
+    multiple: false,
+    directory: true,
+  });
+  return typeof value === "string" ? value : null;
+}
+
 export async function openManagedPath(path: string): Promise<void> {
   await invoke("open_path", { path });
 }
@@ -58,4 +67,12 @@ export async function setFrontendPreference(preference: "tauri" | "python"): Pro
 
 export async function relaunchLauncher(): Promise<void> {
   await invoke("relaunch_launcher");
+}
+
+export async function getDataDirectory(): Promise<string> {
+  return invoke<string>("get_data_directory");
+}
+
+export async function setDataDirectory(directory: string): Promise<string> {
+  return invoke<string>("set_data_directory", { directory });
 }

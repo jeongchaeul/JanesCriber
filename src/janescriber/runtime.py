@@ -40,6 +40,12 @@ def configure_runtime(base_dir: str | Path, *, create_directories: bool = True) 
     os.environ["HF_HOME"] = str(paths["cache"] / "huggingface")
     os.environ["TRITON_CACHE_DIR"] = str(paths["cache"] / "triton")
     bundled_ffmpeg = base / "ffmpeg"
+    if not bundled_ffmpeg.is_dir():
+        resource_root = os.environ.get("JANESCRIBER_RESOURCE_DIR", "").strip()
+        if resource_root:
+            resource_root_path = Path(resource_root).resolve()
+            candidates = (resource_root_path / "ffmpeg", resource_root_path / "JanesCriber" / "ffmpeg")
+            bundled_ffmpeg = next((candidate for candidate in candidates if candidate.is_dir()), candidates[0])
     if bundled_ffmpeg.is_dir():
         os.environ["PATH"] = str(bundled_ffmpeg) + os.pathsep + os.environ.get("PATH", "")
     return paths

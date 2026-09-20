@@ -1,13 +1,15 @@
-import { Monitor, RotateCcw, Settings2, TerminalSquare } from "lucide-react";
+import { FolderOpen, Monitor, RotateCcw, Settings2, TerminalSquare } from "lucide-react";
 
 type InterfacePreference = "tauri" | "python";
 
 interface SettingsViewProps {
   onSelectInterface: (preference: InterfacePreference, label: string) => void;
   onRelaunch: () => void;
+  dataDirectory: string;
+  onChooseDataDirectory: () => void;
 }
 
-export function SettingsView({ onSelectInterface, onRelaunch }: SettingsViewProps) {
+export function SettingsView({ onSelectInterface, onRelaunch, dataDirectory, onChooseDataDirectory }: SettingsViewProps) {
   return (
     <section className="muted-scroll min-h-0 flex-1 overflow-y-auto p-7">
       <div className="mx-auto max-w-4xl space-y-6">
@@ -54,8 +56,15 @@ export function SettingsView({ onSelectInterface, onRelaunch }: SettingsViewProp
         </section>
 
         <section className="panel p-5" aria-labelledby="local-data-heading">
-          <h2 id="local-data-heading" className="text-[14px] font-semibold text-white">Local-first storage</h2>
-          <p className="mt-2 max-w-2xl text-[11px] leading-5 text-[var(--muted)]">Models, caches, temporary files, and transcripts stay beside JanesCriber whenever the selected engine supports local storage.</p>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 id="local-data-heading" className="text-[14px] font-semibold text-white">Local-first storage</h2>
+              <p className="mt-2 max-w-2xl text-[11px] leading-5 text-[var(--muted)]">Models, caches, temporary files, and transcripts stay in this folder. Put it on another drive to keep large downloads away from C:.</p>
+              <p className="mt-3 truncate rounded-md border border-[var(--line)] bg-black/[.15] px-3 py-2 font-mono text-[10px] text-[var(--cyan)]" title={dataDirectory}>{dataDirectory || "Loading data folder…"}</p>
+            </div>
+            <button type="button" aria-label="Choose data folder" onClick={onChooseDataDirectory} className="subtle-button flex h-9 shrink-0 items-center gap-2 px-3 text-[11px]"><FolderOpen size={14} /> Choose folder</button>
+          </div>
+          <p className="mt-3 text-[10px] text-[var(--faint)]">Changing this takes effect after relaunch. Existing files are not moved automatically.</p>
         </section>
       </div>
     </section>

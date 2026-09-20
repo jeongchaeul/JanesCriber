@@ -23,6 +23,36 @@ and any other situation where searchable local notes matter.
 
 ## Start here
 
+### If you are a normal consumer
+
+1. Open the [JanesCriber Releases page](https://github.com/janecerys/JanesCriber/releases).
+2. Open the newest release and download the asset ending in
+   `-Setup.exe`. Do **not** download the GitHub **Source code** archive and do
+   **not** run `setup.bat` unless you specifically want the developer setup.
+3. Run the installer and launch **JanesCriber Studio** from the Start menu or
+   desktop shortcut. The installer already contains the app, local backend,
+   and FFmpeg; Python, uv, and a separate FFmpeg installation are not needed.
+4. Before downloading a model, open **Settings → Local-first storage → Choose
+   folder** and select a writable location such as `D:\JanesCriberData`.
+   Relaunch Studio when it asks. This keeps transcripts, models, temporary
+   audio, and logs on the drive you choose instead of letting them accumulate
+   on C:.
+5. Choose **Transcription Studio**, select an audio or video file, choose a
+   model and language, then press **Transcribe**. Results appear in the
+   **Transcript Library** and in the selected data folder's `Transcripts`
+   directory.
+
+The one-file consumer installer uses a universal CPU-safe runtime so it can
+start reliably across NVIDIA, AMD, Intel, Apple, and CPU-only machines. It
+does not bundle every vendor's multi-gigabyte accelerator runtime. For
+hardware-tuned CUDA, DirectML, ROCm, XPU, Qwen3-ASR, or specialist developer
+setups, use the developer path below.
+
+If Windows displays a SmartScreen warning, verify that the file came from the
+official release page and that its SHA-256 value matches the accompanying
+`.sha256` asset before choosing **More info → Run anyway**. The installer is
+currently unsigned.
+
 ### If you downloaded a release ZIP
 
 1. Extract the complete ZIP to a folder on the drive where you want JanesCriber
@@ -304,11 +334,46 @@ From a prepared Windows checkout:
 The script builds a PyInstaller directory, bundles FFmpeg, copies available
 dependency notices into `licenses`, includes Studio when its release EXE is
 present, creates a ZIP under `artifacts\releases`, and writes a SHA-256 file.
+The default package deliberately excludes the optional Qwen3-ASR package even
+when it happens to be installed in the developer environment. Include it only
+when you are making a larger specialist bundle:
+
+```powershell
+.\build_release.ps1 -WithQwen
+```
+
 The release is unsigned unless a certificate is supplied:
 
 ```powershell
 .\build_release.ps1 -CertificatePath C:\path\to\signing-certificate.pfx
 ```
+
+### One consumer installer
+
+The normal consumer build produces one NSIS setup executable containing the
+Studio UI, a universal CPU-safe packaged Python backend, and the local FFmpeg
+runtime. This keeps the installer below Windows' single-file NSIS size limit
+while preserving a reliable fallback on machines with NVIDIA, AMD, Intel,
+Apple, or no usable accelerator:
+
+```powershell
+.\build_consumer_installer.ps1
+```
+
+The output is written to `artifacts\releases` as:
+
+```text
+JanesCriber-1.0.0-Setup.exe
+JanesCriber-1.0.0-Setup.exe.sha256
+JanesCriber-1.0.0-Setup.exe.json
+```
+
+Qwen3-ASR and hardware-specific CUDA/ROCm/XPU/DirectML package variants remain
+opt-in through the developer build path. Use `setup.bat` when you want the
+largest hardware-tuned runtime and model choices; use the one-file installer
+when you want the simplest universal installation. The existing `setup.bat`
+path is the developer/nerdy safety net. A consumer does not need Python, uv,
+FFmpeg, or the repository checkout after installing the setup executable.
 
 ### JanesCriber Studio
 
@@ -320,6 +385,9 @@ Rust toolchain:
 .\build_release.ps1
 .\build_desktop_ui.ps1
 ```
+
+For a single consumer artifact, prefer `build_consumer_installer.ps1` above;
+the two commands here are useful when developing Studio independently.
 
 The desktop build script installs the locked frontend dependencies, builds the
 frontend, then creates the native Tauri bundle. Use

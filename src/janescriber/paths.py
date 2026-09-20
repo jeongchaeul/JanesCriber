@@ -11,6 +11,11 @@ from .runtime import configure_runtime
 
 
 def project_dir() -> Path:
+    # A packaged consumer install can keep the immutable executable resources
+    # separate from the writable data directory selected by the user.
+    configured = os.environ.get("JANESCRIBER_DATA_DIR", "").strip()
+    if configured:
+        return Path(configured).expanduser().resolve()
     # Works from source checkout and from a PyInstaller-style executable.
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
@@ -21,6 +26,9 @@ def resource_dir() -> Path:
     """Return the directory containing bundled read-only application assets."""
     if getattr(sys, "frozen", False):
         return Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+    configured = os.environ.get("JANESCRIBER_RESOURCE_DIR", "").strip()
+    if configured:
+        return Path(configured).expanduser().resolve()
     return project_dir()
 
 

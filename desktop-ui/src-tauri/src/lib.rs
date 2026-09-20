@@ -36,8 +36,56 @@ fn source_root() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."))
 }
 
+fn resource_root(app: &tauri::AppHandle) -> PathBuf {
+    if let Ok(resource) = std::env::var("JANESCRIBER_RESOURCE_DIR") {
+        let resource = PathBuf::from(resource);
+        if resource.is_dir() {
+            return resource;
+        }
+    }
+    if let Ok(resource) = app.path().resource_dir() {
+        return resource;
+    }
+    if let Ok(executable) = std::env::current_exe() {
+        if let Some(parent) = executable.parent() {
+            return parent.to_path_buf();
+        }
+    }
+    source_root()
+}
+
+fn data_location_path(app: &tauri::AppHandle) -> PathBuf {
+    app.path()
+        .app_config_dir()
+        .unwrap_or_else(|_| source_root().join(".config"))
+        .join("data.location")
+}
+
+fn data_root(app: &tauri::AppHandle) -> PathBuf {
+    if let Ok(data_dir) = std::env::var("JANESCRIBER_DATA_DIR") {
+        let data_dir = data_dir.trim();
+        if !data_dir.is_empty() {
+            return PathBuf::from(data_dir);
+        }
+    }
+    if let Ok(saved) = fs::read_to_string(data_location_path(app)) {
+        let saved = saved.trim();
+        if !saved.is_empty() {
+            return PathBuf::from(saved);
+        }
+    }
+    if cfg!(debug_assertions) {
+        source_root()
+    } else {
+        app.path().app_data_dir().unwrap_or_else(|_| source_root())
+    }
+}
+
 fn preference_candidates(app: Option<&tauri::AppHandle>) -> Vec<PathBuf> {
     let mut roots = Vec::new();
+    if let Some(app) = app {
+        roots.push(data_root(app));
+    }
     if let Ok(data_dir) = std::env::var("JANESCRIBER_DATA_DIR") {
         roots.push(PathBuf::from(data_dir));
     }
@@ -56,28 +104,10 @@ fn preference_candidates(app: Option<&tauri::AppHandle>) -> Vec<PathBuf> {
     roots.into_iter().map(|root| root.join("frontend.preference")).collect()
 }
 
-fn launcher_candidates(app: &tauri::AppHandle) -> Vec<PathBuf> {
-    let mut roots = Vec::new();
-    roots.push(source_root());
-    if let Ok(executable) = std::env::current_exe() {
-        if let Some(parent) = executable.parent() {
-            roots.push(parent.to_path_buf());
-        }
-    }
-    if let Ok(resource) = app.path().resource_dir() {
-        roots.push(resource.clone());
-        roots.push(resource.join("JanesCriber"));
-    }
-    roots.dedup();
-    roots.into_iter().map(|root| root.join("JanesCriber.exe")).collect()
-}
-
 fn candidate_backend(app: &tauri::AppHandle) -> (PathBuf, Vec<String>, PathBuf) {
     let source = source_root();
     let mut roots = Vec::new();
-    if let Ok(resource) = app.path().resource_dir() {
-        roots.push(resource);
-    }
+    roots.push(resource_root(app));
     if let Ok(executable) = std::env::current_exe() {
         if let Some(parent) = executable.parent() {
             roots.push(parent.to_path_buf());
@@ -121,6 +151,51 @@ fn candidate_backend(app: &tauri::AppHandle) -> (PathBuf, Vec<String>, PathBuf) 
     )
 }
 
+fn candidate_legacy_gui(app: &tauri::AppHandle) -> (PathBuf, Vec<String>, PathBuf) {
+    let source = source_root();
+    let mut roots = vec![resource_root(app)];
+    if let Ok(executable) = std::env::current_exe() {
+        if let Some(parent) = executable.parent() {
+            roots.push(parent.to_path_buf());
+        }
+    }
+    roots.push(source.clone());
+    roots.dedup();
+
+    for root in &roots {
+        let relatives = if root == &source {
+            vec!["JanesCriberBackend.exe", "backend/JanesCriberBackend.exe"]
+        } else {
+            vec![
+                "backend/JanesCriber.exe",
+                "JanesCriberBackend.exe",
+                "JanesCriber/JanesCriber.exe",
+                "JanesCriber.exe",
+            ]
+        };
+        for relative in relatives {
+            let path = root.join(relative);
+            if path.is_file() {
+                return (path, vec!["--gui".into()], root.clone());
+            }
+        }
+    }
+
+    let python = source.join(".venv").join("Scripts").join("python.exe");
+    if python.is_file() {
+        return (
+            python,
+            vec!["-u".into(), "-m".into(), "janescriber".into(), "--gui".into()],
+            source,
+        );
+    }
+    (
+        PathBuf::from("python"),
+        vec!["-u".into(), "-m".into(), "janescriber".into(), "--gui".into()],
+        source,
+    )
+}
+
 fn emit_system_log(app: &tauri::AppHandle, message: impl Into<String>) {
     let _ = app.emit(
         "backend-event",
@@ -153,6 +228,10 @@ fn ensure_backend(app: &tauri::AppHandle, state: &BackendState) -> Result<Backen
     }
 
     let (program, args, working_directory) = candidate_backend(app);
+    let data_directory = data_root(app);
+    let resource_directory = resource_root(app);
+    fs::create_dir_all(&data_directory)
+        .map_err(|error| format!("Could not prepare JanesCriber data directory: {error}"))?;
     let mut command = Command::new(&program);
     configure_background_command(&mut command);
     command
@@ -160,6 +239,8 @@ fn ensure_backend(app: &tauri::AppHandle, state: &BackendState) -> Result<Backen
         .current_dir(&working_directory)
         .env("PYTHONUNBUFFERED", "1")
         .env("PYTHONPATH", working_directory.join("src"))
+        .env("JANESCRIBER_DATA_DIR", &data_directory)
+        .env("JANESCRIBER_RESOURCE_DIR", &resource_directory)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -265,20 +346,64 @@ fn set_frontend_preference(app: tauri::AppHandle, preference: String) -> Result<
 }
 
 #[tauri::command]
+fn get_data_directory(app: tauri::AppHandle) -> Result<String, String> {
+    let directory = data_root(&app);
+    fs::create_dir_all(&directory)
+        .map_err(|error| format!("Could not prepare the data directory: {error}"))?;
+    Ok(directory.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn set_data_directory(app: tauri::AppHandle, directory: String) -> Result<String, String> {
+    let raw = directory.trim();
+    if raw.is_empty() {
+        return Err("Choose a data folder first.".to_owned());
+    }
+    let candidate = PathBuf::from(raw);
+    fs::create_dir_all(&candidate)
+        .map_err(|error| format!("Could not create the selected data folder: {error}"))?;
+    if !candidate.is_dir() {
+        return Err("The selected data path is not a folder.".to_owned());
+    }
+    let resolved = fs::canonicalize(&candidate)
+        .map_err(|error| format!("Could not resolve the selected data folder: {error}"))?;
+    let location = data_location_path(&app);
+    if let Some(parent) = location.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("Could not prepare the settings folder: {error}"))?;
+    }
+    fs::write(&location, format!("{}\n", resolved.display()))
+        .map_err(|error| format!("Could not save the data folder setting: {error}"))?;
+    Ok(resolved.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
 fn relaunch_launcher(app: tauri::AppHandle, state: State<'_, BackendState>) -> Result<(), String> {
-    let launcher = launcher_candidates(&app)
+    let data_directory = data_root(&app);
+    let resource_directory = resource_root(&app);
+    let preference = preference_candidates(Some(&app))
         .into_iter()
-        .find(|candidate| candidate.is_file())
-        .ok_or_else(|| "JanesCriber.exe was not found beside the application.".to_owned())?;
+        .find_map(|candidate| fs::read_to_string(candidate).ok())
+        .map(|value| value.trim().to_owned())
+        .filter(|value| value == "python" || value == "tauri")
+        .unwrap_or_else(|| "tauri".to_owned());
     backend_stop(state)?;
-    let working_directory = launcher.parent().unwrap_or_else(|| Path::new("."));
-    let mut command = Command::new(&launcher);
+    let (program, args, working_directory) = if preference == "python" {
+        candidate_legacy_gui(&app)
+    } else {
+        let current = std::env::current_exe().map_err(|error| format!("Could not locate JanesCriber Studio: {error}"))?;
+        let working_directory = current.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
+        (current, Vec::new(), working_directory)
+    };
+    let mut command = Command::new(&program);
     configure_background_command(&mut command);
     command
         .current_dir(working_directory)
-        .env("JANESCRIBER_DATA_DIR", working_directory)
+        .env("JANESCRIBER_DATA_DIR", &data_directory)
+        .env("JANESCRIBER_RESOURCE_DIR", &resource_directory)
+        .args(args)
         .spawn()
-        .map_err(|error| format!("Could not relaunch JanesCriber: {error}"))?;
+        .map_err(|error| format!("Could not relaunch JanesCriber through {}: {error}", program.display()))?;
     app.exit(0);
     Ok(())
 }
@@ -307,7 +432,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(BackendState::default())
-        .invoke_handler(tauri::generate_handler![backend_request, backend_stop, open_path, set_frontend_preference, relaunch_launcher])
+        .invoke_handler(tauri::generate_handler![backend_request, backend_stop, open_path, set_frontend_preference, get_data_directory, set_data_directory, relaunch_launcher])
         .build(tauri::generate_context!())
         .expect("error while building JanesCriber Studio")
         .run(|app, event| {

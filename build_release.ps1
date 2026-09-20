@@ -1,6 +1,8 @@
 param(
     [string]$Version = "",
-    [string]$CertificatePath = ""
+    [string]$CertificatePath = "",
+    [switch]$WithQwen,
+    [string]$PythonPath = ""
 )
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
@@ -11,17 +13,26 @@ if (-not $Version) { throw "Could not determine JanesCriber version." }
 if (-not (Test-Path -LiteralPath "assets\icon.ico")) {
     throw "assets\icon.ico is required for a branded Windows executable."
 }
-$python = Join-Path $scriptDir ".venv\Scripts\python.exe"
-if (-not (Test-Path -LiteralPath $python)) {
-    throw "The project environment is missing. Run setup.bat before building the release."
+$python = if ($PythonPath) {
+    [System.IO.Path]::GetFullPath($PythonPath)
+} else {
+    Join-Path $scriptDir ".venv\Scripts\python.exe"
 }
+if (-not (Test-Path -LiteralPath $python)) {
+    throw "The selected build environment is missing: $python"
+}
+$sitePackages = Split-Path -Parent $python | Split-Path -Parent | Join-Path -ChildPath "Lib\site-packages"
 $artifactRoot = Join-Path $scriptDir "artifacts"
 $staging = Join-Path $artifactRoot "releases\JanesCriber-$Version"
 $archive = Join-Path $artifactRoot "releases\JanesCriber-$Version-windows.zip"
 $portableDist = Join-Path $artifactRoot "build\portable-dist"
 $pyinstallerWork = Join-Path $artifactRoot "build\pyinstaller-build"
 $specRoot = Join-Path $artifactRoot "build"
-$qwenInstalled = Test-Path -LiteralPath (Join-Path $scriptDir ".venv\Lib\site-packages\qwen_asr")
+$qwenInstalled = $WithQwen -and (Test-Path -LiteralPath (Join-Path $sitePackages "qwen_asr"))
+$qwenAvailable = Test-Path -LiteralPath (Join-Path $sitePackages "qwen_asr")
+if ($WithQwen -and -not $qwenAvailable) {
+    throw "Qwen3-ASR was requested for the package, but it is not installed. Run setup.bat qwen first."
+}
 $qwenPyInstallerArgs = @()
 if ($qwenInstalled) {
     $qwenPyInstallerArgs = @("--collect-all", "qwen_asr", "--collect-all", "qwen_omni_utils")
@@ -56,6 +67,25 @@ $portableApp = Join-Path $portableDist "JanesCriber"
 if (-not (Test-Path -LiteralPath (Join-Path $portableApp "JanesCriber.exe"))) {
     throw "PyInstaller completed without producing JanesCriber.exe."
 }
+
+$ffmpegCommand = Get-Command ffmpeg -ErrorAction SilentlyContinue
+$ffprobeCommand = Get-Command ffprobe -ErrorAction SilentlyContinue
+if (-not $ffmpegCommand -or -not $ffprobeCommand) {
+    throw "FFmpeg and FFprobe must be installed on the build machine so they can be bundled."
+}
+$ffmpegLink = Get-Item -LiteralPath $ffmpegCommand.Source -Force
+$ffmpegBin = Split-Path -Parent $ffmpegCommand.Source
+if ($ffmpegLink.Target) { $ffmpegBin = Split-Path -Parent ([string]$ffmpegLink.Target) }
+$bundledFfmpeg = Join-Path $portableApp "ffmpeg"
+New-Item -ItemType Directory -Path $bundledFfmpeg -Force | Out-Null
+$ffmpegFiles = Get-ChildItem -LiteralPath $ffmpegBin -File | Where-Object {
+    $_.Name -in @("ffmpeg.exe", "ffprobe.exe") -or $_.Extension -eq ".dll"
+}
+if (-not ($ffmpegFiles | Where-Object Name -eq "ffmpeg.exe") -or -not ($ffmpegFiles | Where-Object Name -eq "ffprobe.exe")) {
+    throw "The detected FFmpeg directory did not contain both ffmpeg.exe and ffprobe.exe."
+}
+foreach ($file in $ffmpegFiles) { Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $bundledFfmpeg $file.Name) -Force }
+
 $studioExecutable = Join-Path $scriptDir "desktop-ui\src-tauri\target\release\janescriber-studio.exe"
 if (Test-Path -LiteralPath $studioExecutable) {
     Copy-Item -LiteralPath $studioExecutable -Destination (Join-Path $portableApp "JanesCriberStudio.exe") -Force
@@ -68,25 +98,8 @@ foreach ($file in @("README.md", "ARCHITECTURE.md")) {
     Copy-Item -LiteralPath (Join-Path $scriptDir $file) -Destination (Join-Path $staging $file) -Force
 }
 
-$ffmpegCommand = Get-Command ffmpeg -ErrorAction SilentlyContinue
-$ffprobeCommand = Get-Command ffprobe -ErrorAction SilentlyContinue
-if (-not $ffmpegCommand -or -not $ffprobeCommand) {
-    throw "FFmpeg and FFprobe must be installed on the build machine so they can be bundled."
-}
-$ffmpegLink = Get-Item -LiteralPath $ffmpegCommand.Source -Force
-$ffmpegBin = Split-Path -Parent $ffmpegCommand.Source
-if ($ffmpegLink.Target) { $ffmpegBin = Split-Path -Parent ([string]$ffmpegLink.Target) }
-$bundledFfmpeg = Join-Path $staging "ffmpeg"
-New-Item -ItemType Directory -Path $bundledFfmpeg -Force | Out-Null
-$ffmpegFiles = Get-ChildItem -LiteralPath $ffmpegBin -File | Where-Object { $_.Extension -in @(".exe", ".dll") }
-if (-not ($ffmpegFiles | Where-Object Name -eq "ffmpeg.exe") -or -not ($ffmpegFiles | Where-Object Name -eq "ffprobe.exe")) {
-    throw "The detected FFmpeg directory did not contain both ffmpeg.exe and ffprobe.exe."
-}
-foreach ($file in $ffmpegFiles) { Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $bundledFfmpeg $file.Name) -Force }
-
 $licenseRoot = Join-Path $staging "licenses"
 New-Item -ItemType Directory -Path $licenseRoot -Force | Out-Null
-$sitePackages = Join-Path $scriptDir ".venv\Lib\site-packages"
 foreach ($metadata in Get-ChildItem -LiteralPath $sitePackages -Directory -Filter "*.dist-info" -ErrorAction SilentlyContinue) {
     $licenseFiles = Get-ChildItem -LiteralPath (Join-Path $metadata.FullName "licenses") -File -ErrorAction SilentlyContinue
     foreach ($license in $licenseFiles) {
