@@ -15,6 +15,19 @@ if (-not $Version) {
 }
 if (-not $Version) { throw "Could not determine JanesCriber version." }
 
+$projectPython = Join-Path $scriptDir ".venv\Scripts\python.exe"
+if (-not (Test-Path -LiteralPath $projectPython)) {
+    throw "The developer Python environment is required to validate the release version. Run setup.bat first."
+}
+$previousPythonPath = $env:PYTHONPATH
+$env:PYTHONPATH = Join-Path $scriptDir "src"
+try {
+    & $projectPython -m janescriber.versioning --root $scriptDir --version $Version
+    if ($LASTEXITCODE -ne 0) { throw "Project version metadata is inconsistent." }
+} finally {
+    $env:PYTHONPATH = $previousPythonPath
+}
+
 function Invoke-Checked {
     param(
         [string]$FilePath,
@@ -147,10 +160,7 @@ $manifest = [ordered]@{
 }
 $manifest | ConvertTo-Json | Set-Content -LiteralPath $manifestOutput -Encoding utf8
 
-$validationPython = Join-Path $scriptDir ".venv\Scripts\python.exe"
-if (-not (Test-Path -LiteralPath $validationPython)) {
-    throw "The developer Python environment is required to validate the consumer installer. Run setup.bat first."
-}
+$validationPython = $projectPython
 $previousPythonPath = $env:PYTHONPATH
 $env:PYTHONPATH = Join-Path $scriptDir "src"
 try {

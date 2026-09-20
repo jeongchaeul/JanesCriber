@@ -38,6 +38,9 @@ jobs:
       - name: Compile Python sources
         run: uv run python -m compileall -q src
 
+      - name: Check release version consistency
+        run: uv run python -m janescriber.versioning --root .
+
   desktop:
     name: Desktop UI and native source checks
     runs-on: windows-latest
