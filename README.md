@@ -1,363 +1,421 @@
 <div align="center">
   <img src="assets/icon.png" alt="JanesCriber logo" width="128">
   <h1>JanesCriber</h1>
-  <p><strong>Local-first audio and video transcription for Windows</strong></p>
-  <p>Private by default · GPU-aware · Timestamped documentation</p>
+  <p><strong>Private, local-first audio and video transcription</strong></p>
+  <p>Janes Media Suite · v1.0.0 · Windows desktop release</p>
 </div>
 
 <br>
 
-JanesCriber is the transcription member of the Jane Media Suite. It turns
-recordings, videos, microphone input, system audio, and supported application
-audio into readable timestamped text—without sending your media to a cloud
+JanesCriber turns recordings, videos, microphone input, system audio, and
+supported application audio into readable timestamped text. Your media is
+processed on your machine instead of being uploaded to a transcription
 service.
 
-The project is designed for people who need dependable documentation from
-meetings, calls, interviews, lectures, videos, and everyday conversations.
+This is the transcription member of the Jane Media Suite. It is intended for
+meetings, calls, interviews, lectures, videos, accessibility documentation,
+and any other situation where searchable local notes matter.
 
-> **Project status:** JanesCriber is under active development. The portable
-> Windows build is usable, but hardware-specific and long-session testing is
-> still part of the release process.
+> **v1.0.0 status:** This is the first public release of the local
+> transcription workflow. Hardware drivers, model downloads, audio devices,
+> and Windows permissions vary between machines, so the troubleshooting and
+> compatibility notes below are part of the product—not optional fine print.
 
-## Highlights
+## Start here
 
-- **Audio and video files** — Open any format that the bundled FFmpeg build can
-  read, including MP3, WAV, M4A, FLAC, AAC, OGG, MP4, MKV, MOV, and WEBM.
-- **Four local ASR engines** — Choose between Whisper, Qwen3-ASR, Vosk/Kaldi,
-  and Wav2Vec2 depending on your priorities for accuracy, speed, language
-  coverage, and memory use.
-- **Live transcription** — Capture a microphone, system output, or a visible
-  application window while it is happening.
-- **GPU acceleration when available** — NVIDIA CUDA/FP16 and Apple MPS are
-  detected automatically; AMD, Intel, and CPU-only machines use the CPU path.
-- **Searchable language picker** — Whisper supports its broad multilingual
-  catalog, including Tagalog/Filipino, with search by language name, native name,
-  or code.
-- **Transcript Library** — Browse saved transcripts, open their containing
-  folder, delete files, and read transcript text inside the application.
-- **Readable output** — Timestamps are rendered as their own lines, followed by
-  the corresponding transcript text.
-- **Recovery-friendly pipeline** — Progress, hardware state, console messages,
-  cancellation, cleanup, and failures are surfaced instead of disappearing
-  behind a permanently busy screen.
-- **Project-local storage** — Generated transcripts, model downloads, caches,
-  and temporary media stay beside the application whenever possible.
+### If you downloaded a release ZIP
 
-## Example output
+1. Extract the complete ZIP to a folder on the drive where you want JanesCriber
+   to keep its data. A location such as `D:\Apps\JanesCriber` is fine.
+2. Keep every file and folder from the archive together. Do not run the EXE
+   directly from inside the ZIP.
+3. Open `JanesCriber.exe`. Choose **Main UI** when the launcher offers the
+   interface choice. The legacy Python UI remains available as a fallback.
+4. The first time you select a model, JanesCriber downloads that model into
+   the local `.cache` folder. This requires internet access once; the actual
+   transcription remains local.
 
-```text
-[00:00:00.660 --> 00:00:03.640]
->Hey man, so I called because I wanted to talk to you about something.
+The portable release contains the packaged Python runtime, the legacy
+interface, JanesCriber Studio when it was included in the build, FFmpeg, and
+the dependency notices. It does not require a separate Python installation.
+The selected ASR model is downloaded on demand because bundling every model
+would make the download unnecessarily large.
 
-[00:00:05.420 --> 00:00:10.640]
->I wanted to give you the full details before I head over there.
-```
+### If you are running from the Git repository
 
-Each completed file is written as UTF-8 text in the `Transcripts` folder.
-
-## Choose the right engine
-
-| Engine | Best for | Languages | Acceleration | Live capture |
-| --- | --- | --- | --- | --- |
-| **Whisper (OpenAI)** | Highest-quality general transcription and multilingual audio | Broad multilingual catalog | NVIDIA CUDA/FP16, Apple MPS, or CPU | Yes |
-| **Qwen3-ASR** | Strong independent multilingual recognition, including Filipino/Tagalog | 30 languages and dialects | NVIDIA CUDA/FP16, Apple MPS, or CPU | File transcription |
-| **Vosk / Kaldi** | Lightweight, offline transcription and long live sessions | One downloaded language model at a time | CPU in the standard Vosk package | Yes |
-| **Wav2Vec2** | An independent local English-focused model with optional CUDA | English-focused | NVIDIA CUDA when available, otherwise CPU | Yes |
-
-### Whisper
-
-Whisper is the quality-oriented default for mixed, multilingual, noisy, or
-general-purpose recordings. Larger models can improve accuracy, but require
-more memory and take longer to load.
-
-### Vosk / Kaldi
-
-Vosk is an independent offline recognizer and does not use an OpenAI model or a
-cloud API. It is a practical choice for responsive, memory-conscious live
-transcription. Its accuracy depends heavily on the selected language model and
-recording conditions. Model licenses vary; JanesCriber records the model
-metadata and license information beside each downloaded model.
-
-Browse the official Vosk model catalog at
-[alphacephei.com/vosk/models](https://alphacephei.com/vosk/models).
-
-### Wav2Vec2
-
-Wav2Vec2 is an additional local model from Meta AI Research. The bundled
-integration uses the existing Torch runtime and takes advantage of NVIDIA CUDA
-when available, with a CPU fallback. The current model is English-focused and
-is licensed under Apache-2.0.
-
-See the [Wav2Vec2 model card](https://huggingface.co/facebook/wav2vec2-base-960h)
-for its model details and limitations.
-
-### Qwen3-ASR
-
-Qwen3-ASR is an independent open-weight ASR family. It is the strongest
-additional multilingual option in JanesCriber and includes Filipino/Tagalog,
-along with 29 other released languages. The 0.6B model is the sensible
-starting point; the 1.7B model can improve difficult recordings but needs more
-RAM and GPU memory. Its current JanesCriber integration uses bounded 30-second
-timestamp blocks. Choose Whisper when exact word-level timestamps or live
-capture are more important than Qwen's multilingual recognition.
-
-Qwen3-ASR is optional because its official package adds a sizeable dependency
-set. Source users can enable it with:
+The supported Windows setup is:
 
 ```powershell
-.\install.ps1 -WithQwen
-```
-
-The same optional install is available from the batch launcher with
-`setup.bat qwen`.
-
-The model weights are still downloaded only when Qwen3-ASR is selected and are
-stored in `.cache\qwen3-asr` beside the program. The [Qwen3-ASR model card](https://huggingface.co/Qwen/Qwen3-ASR-0.6B)
-documents its languages, local inference package, GPU usage, and timestamp
-aligner limitations.
-
-## Live transcription
-
-Open **Live Transcription** to document speech as it happens. Select a capture
-mode before starting:
-
-- **Microphone** — A physical or virtual input device.
-- **System output** — The audio mix playing through a selected speaker or
-  headset using Windows audio loopback.
-- **Application output** — One visible application window, useful when several
-  applications are producing audio at the same time.
-
-The application picker shows friendly names for visible windows. Background
-processes and raw task-manager PID lists are intentionally hidden. A selected
-application can remain quiet until that application begins playing audio.
-
-### Live-session recommendations
-
-- Start with **Whisper `tiny` or `base`** for the best balance of responsiveness,
-  memory use, and accuracy.
-- Use **Vosk** when a lightweight, long-running session is more important than
-  maximum recognition quality.
-- Use **Wav2Vec2** for an independent local English option when CUDA is
-  available; its live mode uses short rolling recognition windows.
-- Use **Qwen3-ASR** for difficult multilingual file recordings, especially
-  Filipino/Tagalog. It is not currently a live-session engine in JanesCriber.
-- Avoid **Whisper `small`, `turbo`, or `large-v3`** for long live sessions on
-  machines with limited RAM. These models can take substantially longer to load
-  and may make the interface less responsive.
-- For application capture, choose a visible top-level app window and confirm
-  that the app is actually producing audio. The optional ProcTap package is
-  required by the Windows application-output backend.
-
-Live transcripts are saved into `Transcripts` and appear in **Transcript
-Library** after they are finalized.
-
-## JanesCriber Studio
-
-The repository now includes a separate native desktop surface under
-desktop-ui/. JanesCriber Studio uses Tauri 2, React, TypeScript, Tailwind CSS,
-and Motion for a quieter, lighter interface inspired by the Janes Cerys
-portfolio and JaneClipper family programs. The existing Python launcher remains
-available as a fallback.
-
-The Studio exposes the same local engine through a supervised JSON bridge:
-transcription, Qwen3-ASR, Vosk, Wav2Vec2, searchable multi-language selection,
-drag-and-drop input, live capture, the transcript library, hardware telemetry,
-pipeline stages, and console logs all remain available without duplicating ASR
-logic in the frontend.
-
-## Where JanesCriber stores data
-
-JanesCriber follows a local-first, D-drive-friendly layout:
-
-```text
-JanesCriber/
-├─ JanesCriber.exe              Portable application entry point
-├─ Transcripts/                 Completed and live transcript files
-├─ .cache/
-│  ├─ whisper/                  Downloaded Whisper models
-│  ├─ vosk/                     Downloaded Vosk/Kaldi models
-│  ├─ wav2vec2/                 Downloaded Wav2Vec2 models
-│  └─ transcripts/              Validated transcript cache
-├─ temp/                        Short-lived normalized audio files
-├─ artifacts/                   Ignored release/build staging
-└─ desktop-ui/                 Tauri + React source for JanesCriber Studio
-```
-
-The application does not intentionally place transcript output in the Windows
-user profile or redirect it to `C:`. Keep the project and portable release on a
-drive with enough free space, especially when using large Whisper models.
-
-Windows and developer tooling can still maintain their own system-managed files
-outside this folder. The portable application itself keeps its models, cache,
-temporary work, and output beside the program.
-
-## Portable Windows release
-
-The portable build is the simplest way to run JanesCriber on a Windows machine.
-
-1. Download the release ZIP from the repository's Releases page.
-2. Extract it to a permanent folder on the drive where you want the models and
-   transcripts stored.
-3. Launch `JanesCriber.exe`.
-4. Choose a media file, select an engine and language, then start transcription.
-
-Python, Torch, Transformers, and FFmpeg are bundled in the portable release, so
-the target machine does not need Python, `uv`, or a separate FFmpeg installation.
-The first use of a selected model downloads its weights into the matching
-`.cache` folder. Model downloads can be large and require an internet connection
-only for that initial download.
-
-The current portable release targets Windows. NVIDIA acceleration requires a
-compatible installed driver; machines with AMD, Intel, or no supported GPU
-remain usable through the CPU fallback.
-
-## Developer setup
-
-### Requirements
-
-- Windows 10 or Windows 11
-- Python 3.10, 3.11, or 3.12
-- FFmpeg and FFprobe available to the source checkout
-- [uv](https://docs.astral.sh/uv/)
-
-Clone or copy the repository to the drive where you want its environment and
-cache to live, then run:
-
-```bat
+cd "D:\Documents\GitHub Repo\JanesCriber"
 setup.bat
 ```
 
-The setup script verifies Python and FFmpeg, keeps uv's wheel cache beside the
-project, and selects a CPU Torch runtime or an NVIDIA CUDA runtime based on the
-machine. Close any running JanesCriber window before running setup so Windows
-can update the environment safely.
+Before running setup, install these two machine-level prerequisites:
 
-Launch the desktop application with:
+- **[uv](https://docs.astral.sh/uv/)** — creates and manages the private
+  project Python environment.
+- **FFmpeg** with both `ffmpeg.exe` and `ffprobe.exe` available on `PATH` —
+  extracts a consistent speech stream from audio and video.
+
+If Windows asks about microphone or audio capture permissions, allow them when
+you want to use live transcription. The setup script does not silently install
+system-wide FFmpeg or modify unrelated Python installations.
+
+## What `setup.bat` does
+
+The setup script is deliberately the normal entry point. It:
+
+1. Runs from the JanesCriber folder so paths stay attached to the project.
+2. Checks for `uv`, FFmpeg, and `ffprobe` and stops with a readable message if
+   one is missing.
+3. Detects the available hardware profile. NVIDIA CUDA is preferred when the
+   NVIDIA runtime is visible; compatible Windows DirectX 12 hardware can use
+   DirectML; unsupported or failed acceleration falls back to CPU.
+4. Reuses a supported project-local Python environment when possible. If no
+   supported Python 3.10–3.12 interpreter is available, it installs a managed
+   interpreter under `.cache\python` instead of filling a system location.
+5. Synchronizes the locked JanesCriber dependencies into `.venv`.
+6. Installs the matching Torch runtime: CUDA for a detected NVIDIA runtime,
+   DirectML when selected, or the CPU runtime as a safe fallback.
+7. Rebuilds the small Windows launcher when the .NET compiler is available.
+8. Leaves the application ready to launch. Model weights are still downloaded
+   only when a model is first selected.
+
+The installer keeps its uv cache, managed Python, temporary files, Torch cache,
+Hugging Face cache, model files, logs, and transcripts beside the project as
+much as the operating system and selected packages allow. This is why placing
+the project on `D:` is recommended.
+
+### Optional setup modes
 
 ```powershell
-uv run python -m janescriber --gui
+setup.bat                 # standard local setup; recommended
+setup.bat qwen            # also install the optional Qwen3-ASR backend
+setup.bat directml        # force the Windows DirectML compatibility backend
 ```
 
-The first use of Whisper, Vosk, Wav2Vec2, or Qwen3-ASR downloads the selected
-model into the corresponding project-local cache. Qwen3-ASR is opt-in because
-its supporting Python package is larger than the built-in engines; enable it
-with `.\install.ps1 -WithQwen` before selecting it.
+Do not combine `qwen` and `directml` in v1.0.0. The current optional package
+matrix cannot use Qwen3-ASR with the DirectML Torch package. On a non-NVIDIA
+Windows machine, plain `setup.bat` automatically chooses DirectML when it can
+identify a physical DirectX 12 adapter; use `setup.bat qwen` when Qwen3-ASR is
+more important, which keeps the standard Torch runtime instead.
 
-## Command-line use
+## What happens on the first transcription
 
-JanesCriber can also transcribe a file without opening the desktop interface:
+1. JanesCriber validates the selected media without moving or modifying the
+   source file.
+2. FFmpeg extracts a 16 kHz mono speech stream into the project `temp` folder.
+3. The selected ASR model is loaded. The Console Logs and pipeline tracker
+   show download, model-load, accelerator, and transcription progress.
+4. The recognizer produces timestamped segments. Whisper also produces
+   word-level timing information when available.
+5. JanesCriber renders a readable text file and publishes it atomically in
+   `Transcripts`.
+6. The file appears in **Transcript Library**, where it can be read, opened in
+   Explorer, or deleted.
+
+The default behavior avoids overwriting an existing transcript. Turn on
+**Overwrite same-name transcript** in the UI or pass `--overwrite` when you
+explicitly want replacement.
+
+## Highlights
+
+- **Audio and video input** — Anything the included or installed FFmpeg build
+  can read, including MP3, WAV, M4A, FLAC, AAC, OGG, MP4, MKV, MOV, and WEBM.
+- **Four local ASR families** — Whisper, Qwen3-ASR, Vosk/Kaldi, and Wav2Vec2.
+- **Live transcription** — Capture a microphone, system output, or a visible
+  application output source while it is happening.
+- **GPU-first runtime selection** — Uses the best compatible runtime exposed by
+  the installed packages, then falls back cleanly instead of assuming every
+  computer has NVIDIA CUDA.
+- **Searchable language selection** — Whisper's language catalog includes
+  Tagalog/Filipino and can be searched by language name, native name, or code.
+- **Transcript Library** — Manage and read generated transcripts inside the
+  application without opening a separate viewer window.
+- **Live console and pipeline tracker** — See what the worker is doing when a
+  model takes time to load or a device needs a fallback.
+- **Project-local data** — Outputs, model caches, scratch files, and logs are
+  kept beside the program whenever possible.
+
+## Choose the right ASR engine
+
+| Engine | Best fit | Language behavior | Acceleration | Live capture |
+| --- | --- | --- | --- | --- |
+| **Whisper** | Best general quality, multilingual recordings, noisy audio | Broad multilingual catalog with searchable selection | CUDA/ROCm, Intel XPU, Apple MPS, DirectML, or CPU | Yes |
+| **Qwen3-ASR** | Independent open-weight multilingual file transcription | Supported Qwen language and dialect catalog, including Filipino/Tagalog | CUDA/ROCm, Intel XPU, Apple MPS, or CPU | No, file transcription only in v1.0.0 |
+| **Vosk / Kaldi** | Lightweight, responsive, long live sessions | One downloaded Vosk language model at a time | CPU in the standard package | Yes |
+| **Wav2Vec2** | Independent local English-focused option | English-focused | CUDA/ROCm, Intel XPU, Apple MPS, DirectML, or CPU | Yes |
+
+### Whisper
+
+Whisper is the default quality-oriented choice for mixed languages, noisy
+recordings, and general use. `tiny` and `base` are the most practical live
+choices. `small`, `turbo`, and `large-v3` can produce better results but need
+more memory and can take longer to load.
+
+### Qwen3-ASR
+
+Qwen3-ASR is an optional independent open-weight ASR family. It is useful when
+you want a non-OpenAI model, especially for supported multilingual file
+recordings. Install it with `setup.bat qwen`; it is not enabled by the normal
+setup because it adds a substantial optional package and model download.
+
+Qwen3-ASR is intentionally file-only in this release. Use Whisper, Vosk, or
+Wav2Vec2 for live sessions.
+
+### Vosk / Kaldi
+
+Vosk is the lightweight live option. It starts quickly and is a good choice for
+long sessions or machines with limited memory. Its accuracy depends heavily on
+the selected Vosk model and language. Models are downloaded to
+`.cache\vosk` only when selected.
+
+### Wav2Vec2
+
+Wav2Vec2 provides another local English-focused path. It uses the same device
+selection and CPU-retry behavior as the rest of the Torch-backed pipeline, but
+its bundled model is not a replacement for Whisper's multilingual catalog.
+
+## GPU and CPU behavior
+
+JanesCriber does not hard-code one graphics vendor. At runtime it checks the
+available Torch device backends and uses the first usable accelerator in this
+order:
+
+1. NVIDIA CUDA or AMD ROCm/HIP through Torch's shared `cuda` device API.
+2. Intel XPU when the Intel extension is installed and usable.
+3. Apple MPS on Apple Silicon/macOS builds.
+4. Optional Windows DirectML for compatible DirectX 12 GPUs.
+5. CPU fallback.
+
+The exact result depends on the operating system, GPU driver, Torch wheel, and
+model backend. A GPU being present does not guarantee that every model can run
+on it. If model initialization fails on an accelerator, JanesCriber reports
+the failure and retries on CPU rather than silently losing the job.
+
+| Machine | Recommended path |
+| --- | --- |
+| NVIDIA GPU | Run normal `setup.bat`; CUDA is selected when `nvidia-smi` is available. |
+| AMD GPU on Linux | Install a Torch ROCm build appropriate for the machine. |
+| AMD or Intel GPU on Windows | Normal setup can select DirectML; `setup.bat directml` forces it. |
+| Intel GPU with XPU support | Use the matching Intel Torch/XPU environment when available. |
+| Apple Silicon | Use a native macOS environment with the MPS-capable Torch build. |
+| No usable GPU | Run the CPU runtime; choose `tiny`, `base`, or Vosk for responsiveness. |
+
+The Windows DirectML path is a compatibility path, not a promise that every
+DirectX device will perform like native CUDA. Native runtimes are preferred
+when a stable, model-compatible build exists.
+
+## Live transcription
+
+Open **Live Transcription** and choose one of these sources:
+
+- **Microphone** — a physical or virtual input device.
+- **System output** — audio currently playing through a speaker or headset.
+- **Application output** — a visible application window that is currently
+  producing audio. Background processes and hidden windows are intentionally
+  not shown.
+
+For a first live test, use Whisper `tiny` or `base`, or Vosk. Large Whisper
+models are poor choices for a long live session on a memory-limited computer.
+Choose the source that is actually producing audio, refresh the source list if
+you opened a new app, and check Windows microphone permissions. Application
+output capture requires the optional Windows ProcTap package included by the
+normal Windows dependency setup.
+
+Live sessions continuously write timestamped text into `Transcripts` and make
+the finished file available in **Transcript Library**. Stop and save before
+closing the application so the final segment is flushed.
+
+## Storage and C: drive protection
+
+When the project or portable folder is on `D:`, JanesCriber uses these paths:
+
+```text
+JanesCriber\
+├─ Transcripts\             Completed .txt files, including live sessions
+├─ .cache\
+│  ├─ whisper\              Whisper model weights
+│  ├─ vosk\                 Vosk/Kaldi model files
+│  ├─ wav2vec2\             Wav2Vec2 model files
+│  ├─ qwen3-asr\            Optional Qwen3-ASR model files
+│  ├─ huggingface\          Hugging Face downloads
+│  ├─ torch\                Torch cache
+│  ├─ uv-cache\             uv package cache
+│  ├─ python\               Managed Python, if setup had to install it
+│  └─ logs\                 Local diagnostic logs
+└─ temp\                    Temporary normalized audio and working files
+```
+
+The source media is never moved or modified. Transcript output is not written
+beside the source media; it is written to the program's `Transcripts` folder.
+On first use, model downloads can be large. Delete only unused model folders
+from `.cache` when you need space; JanesCriber will download a selected model
+again if it is needed later.
+
+The operating system, GPU drivers, browser downloads, and developer tools may
+still use C:. JanesCriber controls its own caches and temporary paths, not
+every cache created by Windows or third-party package managers.
+
+## Main UI and legacy UI
+
+JanesCriber ships with two interfaces:
+
+- **JanesCriber Studio** — the native Tauri/React interface with the Studio
+  layout, library, hardware monitor, settings, and compact live console.
+- **Legacy Python UI** — the original dependable console-oriented interface and
+  a useful fallback for diagnosing backend issues.
+
+When both are packaged, use **Settings** in Studio to choose which interface
+the launcher should use on the next launch, then relaunch. If Studio is not
+present in a source checkout, the launcher falls back to the legacy UI.
+
+## Command line
+
+The backend can be used without a desktop window:
 
 ```powershell
-uv run python -m janescriber "D:\Media\interview.mp4"
-uv run python -m janescriber "D:\Media\meeting.m4a" --model large-v3 --language en
-uv run python -m janescriber "D:\Media\meeting.m4a" --overwrite
+.\.venv\Scripts\python.exe -m janescriber path\to\recording.mp4
+.\.venv\Scripts\python.exe -m janescriber path\to\recording.mp4 --engine whisper --model turbo
+.\.venv\Scripts\python.exe -m janescriber path\to\recording.mp4 --engine vosk --model en-us-small
+.\.venv\Scripts\python.exe -m janescriber path\to\recording.mp4 --engine wav2vec2 --model wav2vec2-base-960h
+.\.venv\Scripts\python.exe -m janescriber path\to\recording.mp4 --overwrite
 ```
 
-Run the help command to see the options available in the installed version:
+The output is saved in `Transcripts`. Use the application for the searchable
+multi-language picker, live capture sources, pipeline display, and library
+actions.
 
-```powershell
-uv run python -m janescriber --help
-```
+Use the project interpreter directly after setup. A plain `uv run` can ask uv
+to reconcile Whisper's transitive Torch dependency with a generic PyPI wheel,
+which may replace a hardware-specific Torch installation. If you do use uv,
+prefer `uv run --no-sync` after setup.
 
-## Build a portable executable
+## Building a release
 
-After completing source setup, build the Windows bundle with:
+### Portable legacy/backend package
+
+From a prepared Windows checkout:
 
 ```powershell
 .\build_release.ps1
 ```
 
-The output is placed in artifacts\releases\ and artifacts\build\. The build script creates the portable folder,
-copies the required runtime assets, verifies important bundled components, and
-can create a release ZIP. The executable is unsigned by default; provide a code
-signing certificate to the build script when preparing a trusted public release.
+The script builds a PyInstaller directory, bundles FFmpeg, copies available
+dependency notices into `licenses`, includes Studio when its release EXE is
+present, creates a ZIP under `artifacts\releases`, and writes a SHA-256 file.
+The release is unsigned unless a certificate is supplied:
 
-Wav2Vec2 and Qwen3-ASR model weights are intentionally downloaded on demand
-rather than bundled into the executable, keeping the release smaller and
-allowing users to choose whether they need those engines. A portable build
-includes Qwen3-ASR only when it is built from an environment where the optional
-Qwen package has been installed.
+```powershell
+.\build_release.ps1 -CertificatePath C:\path\to\signing-certificate.pfx
+```
 
-## Privacy and network behavior
+### JanesCriber Studio
 
-JanesCriber is local-first:
+Studio is built with Tauri 2, React, TypeScript, Tailwind CSS, Framer Motion,
+and Rust native bindings. Building the native UI requires Node.js/npm and the
+Rust toolchain:
 
-- Media is transcribed on the local machine.
-- No cloud API key is required for the local engines.
-- Media and transcript text are not uploaded by the application.
-- Network access is used to download a selected model the first time it is
-  needed in a source or portable installation.
-- Downloaded models and caches remain in the project-local `.cache` directory.
+```powershell
+.\build_release.ps1
+.\build_desktop_ui.ps1
+```
 
-Review the license and usage terms of each selected model. Dependency license
-texts are included in the portable release's `licenses` folder.
+The desktop build script installs the locked frontend dependencies, builds the
+frontend, then creates the native Tauri bundle. Use
+`-SkipLegacyRuntime` only for a frontend-only development build; a distributable
+Studio release should include the packaged backend.
+
+## Privacy, network use, and licensing
+
+- Audio and video are transcribed locally by the selected model.
+- JanesCriber does not send recordings to an AI API.
+- Network access is used for setup dependencies, optional model downloads, and
+  model/runtime caches when a file is not already present.
+- Model and dependency licenses are separate from the JanesCriber project
+  license. Review the license for each selected model before redistributing it.
+- Portable builds include dependency notices when the source metadata exposes
+  them. Keep those notices with redistributed builds.
 
 ## Troubleshooting
 
-### The model appears to be loading for a long time
+### Setup says `uv`, FFmpeg, or `ffprobe` is missing
 
-The first model load includes disk access, model initialization, and—when
-available—transfer into GPU memory. Large models can take several minutes on
-some machines. The Console Logs and pipeline tracker show the active stage. For
-live use, switch to `tiny`, `base`, or Vosk if the machine has limited memory.
+Install the missing prerequisite, open a new PowerShell or Command Prompt so
+`PATH` refreshes, and run `setup.bat` again. The complete FFmpeg package must
+provide both `ffmpeg.exe` and `ffprobe.exe`.
 
-### CUDA is not available
+### The model appears to be stuck loading
 
-JanesCriber continues with CPU transcription. Check the Hardware & Pipeline tab
-and confirm that the installed NVIDIA driver is compatible with the bundled Torch
-runtime. CUDA is an acceleration path, not a requirement for using the program.
+The first load includes disk access, model initialization, and possibly a GPU
+memory transfer. Watch **Console Logs** and **Hardware & Pipeline**. Large
+models can take minutes on some machines. Try Whisper `tiny` or `base` to
+separate a slow model load from a broken audio pipeline.
 
-### Live transcription cannot start
+### The expected GPU is not being used
 
-Confirm that the selected source exists and is producing audio. For microphone
-capture, check Windows microphone permissions and select the correct input
-device. For system output, select an active speaker or headset. For application
-output, refresh the visible application list and select a window that is playing
-audio. Run `setup.bat` again if an optional audio package is missing.
+Check the Hardware & Pipeline page and the Console Logs. The installed Torch
+runtime must match the device family: CUDA/ROCm, Intel XPU, Apple MPS, or
+DirectML. A driver, model, or memory problem can cause a safe CPU retry. CPU
+fallback is slower but is an intentional compatibility behavior.
 
-### The C: drive is filling up
+### Live transcription has no text
 
-Keep the portable folder or source checkout on the desired drive and allow the
-first model download to finish there. Remove unused models from the matching
-`.cache` folder only when you no longer need them. Developer environments and
-package managers may have separate caches that are outside JanesCriber's control.
+Confirm that the selected source is producing audio. For a microphone, check
+Windows privacy permissions and the selected input. For system output, check
+the active speaker or headset. For application output, select a visible window
+that is playing sound and refresh the source list. If the console reports that
+ProcTap or an audio package is missing, run `setup.bat` again.
 
-### A transcript already exists
+### C: is filling up
 
-The default behavior preserves the existing text file. Enable overwrite in the
-desktop interface or pass `--overwrite` on the command line when replacement is
-intentional.
+Place the checkout or portable folder on the desired drive before setup and
+model downloads. Inspect `.cache` and remove unused model directories. Do not
+delete the active `.venv` or a model currently being used. System-level Python,
+uv, GPU-driver, and Windows caches are outside JanesCriber's project-local
+controls.
+
+### The program opens but Studio is unavailable
+
+The legacy launcher and Studio are separate deliverables. Run
+`build_desktop_ui.ps1` to create the Studio executable, or use the legacy UI
+until the Studio build is present beside the launcher.
 
 ## Verification
 
-Run the automated test suite from the project folder:
+Run the tests from the project folder with the project interpreter:
 
 ```powershell
-uv run pytest -q
+.venv\Scripts\python.exe -m pytest -q
+.venv\Scripts\python.exe -m compileall -q src
 ```
 
-The tests cover timestamp formatting, cache validation, safe output naming,
-media validation, cancellation, pipeline cleanup, language handling, live
-capture helpers, and application-local runtime paths. A real GPU/FFmpeg
-transcription should still be smoke-tested on the target Windows machine because
-drivers, audio devices, and media codecs vary between systems.
+The suite covers output naming, timestamp formatting, cache validation, media
+handling, cancellation, cleanup, language selection, live-capture helpers,
+hardware selection, library behavior, launcher preferences, and local runtime
+paths. A real audio/video smoke test should still be performed on the target
+machine because GPU drivers, codecs, permissions, and audio devices vary.
 
 ## Project documentation
 
-- [Architecture](ARCHITECTURE.md) — Backend boundaries and pipeline structure.
-- [Release plan](RELEASE_PLAN.md) — Remaining release-readiness work and gates.
+- [Architecture](ARCHITECTURE.md) — backend boundaries and pipeline structure.
+- [Release notes](CHANGELOG.md) — user-facing v1.0.0 changes.
+- [Release plan](RELEASE_PLAN.md) — follow-up hardening and distribution work.
+- [Desktop UI parity](docs/desktop-ui-parity.md) — legacy and Studio feature
+  coverage.
+- [Desktop UI specification](docs/desktop-ui-spec.md) — Studio design and
+  behavior contract.
 
-## Feedback
+## Reporting an issue
 
-If you find a transcription, capture, packaging, or hardware compatibility
-problem, open an issue with:
+Open an issue with:
 
-- Windows version and hardware summary;
+- Windows version and CPU/GPU summary;
 - selected engine, model, and language;
-- whether the problem occurred with a file, microphone, system output, or
-  application output;
+- whether the issue involved a file, microphone, system output, or application
+  output;
 - the relevant Console Logs text; and
 - steps that reproduce the problem.
 
-Please avoid attaching private recordings or transcripts unless they have been
-sanitized.
+Please do not attach private recordings or transcripts unless they have been
+sanitized and you have permission to share them.

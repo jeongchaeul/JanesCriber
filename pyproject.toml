@@ -1,6 +1,6 @@
 [project]
 name = "janescriber"
-version = "0.1.0"
+version = "1.0.0"
 description = "Jane family local AI audio and video transcription studio"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"

@@ -11,6 +11,8 @@ import time
 from dataclasses import dataclass
 from typing import Callable
 
+from .hardware import detect_hardware
+
 try:
     import psutil
 except ImportError:  # pragma: no cover - dependency is part of the app runtime
@@ -117,6 +119,7 @@ class SystemHardwareMonitor:
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self.gpu_probe = NvidiaSmiProbe()
+        self.detected_hardware = detect_hardware()
 
         if psutil:
             try:
@@ -181,8 +184,12 @@ class SystemHardwareMonitor:
             snapshot.gpu_backend = "NVIDIA CUDA / FP16"
             snapshot.telemetry_source = "nvidia-smi"
         else:
-            snapshot.gpu_backend = "CPU fallback"
-            snapshot.telemetry_source = "Unavailable"
+            snapshot.gpu_backend = str(self.detected_hardware.get("accelerator", "CPU fallback"))
+            snapshot.gpu_name = str(self.detected_hardware.get("gpu", "Not detected"))
+            if str(self.detected_hardware.get("device", "cpu")) == "cpu":
+                snapshot.telemetry_source = "Unavailable"
+            else:
+                snapshot.telemetry_source = "Torch device detection (utilization unavailable)"
 
         with self._lock:
             self.latest_snapshot = snapshot

@@ -2,7 +2,7 @@
 
 This backend is intentionally small and opt-in.  The model is downloaded from
 Hugging Face only when selected, stored under the project cache, and moved to
-CUDA when the installed Torch runtime exposes an NVIDIA device.
+the best accelerator exposed by the installed Torch runtime.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from .cancellation import CancelCheck, check_cancelled
+from .hardware import resolve_accelerator_device
 
 
 @dataclass(frozen=True)
@@ -63,16 +64,25 @@ def _load_session(model_id: str, model_cache: str | Path, device: str, progress,
     check_cancelled(cancel)
     model = AutoModelForCTC.from_pretrained(spec.repository, cache_dir=str(cache_dir))
     check_cancelled(cancel)
-    selected_device = device if device in {"cuda", "mps"} and (
-        (device == "cuda" and torch.cuda.is_available()) or (device == "mps" and getattr(torch.backends, "mps", None) and torch.backends.mps.is_available())
-    ) else "cpu"
+    selected_device = device if device in {"cuda", "xpu", "mps", "dml"} else "cpu"
     if progress:
         progress(0.42, f"Moving Wav2Vec2 into {selected_device.upper()} memory…")
-    model = model.to(selected_device)
+    runtime_device: Any = selected_device
+    try:
+        runtime_device = resolve_accelerator_device(selected_device, torch)
+        model = model.to(runtime_device)
+    except Exception as exc:
+        if selected_device == "cpu":
+            raise
+        if progress:
+            progress(0.44, f"{selected_device.upper()} model load was unavailable ({exc}); retrying Wav2Vec2 on CPU…")
+        selected_device = "cpu"
+        runtime_device = "cpu"
+        model = model.to("cpu")
     model.eval()
     if progress:
         progress(0.48, f"Wav2Vec2 ready on {selected_device.upper()}.")
-    return processor, model, selected_device, torch
+    return processor, model, selected_device, runtime_device, torch
 
 
 def _segments_from_offsets(text: str, offsets: list[dict[str, Any]], frame_count: int, duration: float, offset: float):
@@ -133,10 +143,11 @@ def _segments_from_offsets(text: str, offsets: list[dict[str, Any]], frame_count
 class Wav2Vec2Session:
     """Reusable model session for file and rolling live recognition."""
 
-    def __init__(self, processor: Any, model: Any, device: str, torch_module: Any) -> None:
+    def __init__(self, processor: Any, model: Any, device: str, runtime_device: Any, torch_module: Any) -> None:
         self.processor = processor
         self.model = model
         self.device = device
+        self.runtime_device = runtime_device
         self.torch = torch_module
 
     def transcribe_samples(self, samples: Any, *, sample_rate: int = 16000, offset: float = 0.0) -> dict[str, Any]:
@@ -147,7 +158,7 @@ class Wav2Vec2Session:
         if not len(values):
             return {"text": "", "segments": [], "words": [], "language": "en"}
         inputs = self.processor(values, sampling_rate=sample_rate, return_tensors="pt", padding=True)
-        inputs = {key: value.to(self.device) for key, value in inputs.items() if hasattr(value, "to")}
+        inputs = {key: value.to(self.runtime_device) for key, value in inputs.items() if hasattr(value, "to")}
         with self.torch.inference_mode():
             logits = self.model(**inputs).logits
         predicted = self.torch.argmax(logits, dim=-1)
@@ -164,8 +175,8 @@ class Wav2Vec2Session:
 
 
 def load_wav2vec2_session(model_id: str, model_cache: str | Path, device: str, progress=None, cancel=None) -> Wav2Vec2Session:
-    processor, model, selected_device, torch = _load_session(model_id, model_cache, device, progress, cancel)
-    return Wav2Vec2Session(processor, model, selected_device, torch)
+    processor, model, selected_device, runtime_device, torch = _load_session(model_id, model_cache, device, progress, cancel)
+    return Wav2Vec2Session(processor, model, selected_device, runtime_device, torch)
 
 
 def transcribe_wav2vec_audio(

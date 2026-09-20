@@ -176,7 +176,7 @@ def ensure_vosk_model(
     try:
         if progress:
             progress(0.25, f"Downloading Vosk model: {spec.label}…")
-        request = urllib.request.Request(spec.url, headers={"User-Agent": "JanesCriber/0.1"})
+        request = urllib.request.Request(spec.url, headers={"User-Agent": "JanesCriber/1.0"})
         with urllib.request.urlopen(request, timeout=30) as response, archive_path.open("wb") as handle:
             total_header = response.headers.get("Content-Length")
             total = int(total_header) if total_header and total_header.isdigit() else 0

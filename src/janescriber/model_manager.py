@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from .cancellation import CancelCheck, PipelineAborted, check_cancelled
+from .hardware import clear_accelerator_cache, resolve_accelerator_device
 
 
 _MIN_MODEL_FREE_SPACE = 512 * 1024 * 1024
@@ -84,7 +85,7 @@ def ensure_model_downloaded(
         try:
             check_cancelled(cancel)
             start = partial.stat().st_size if partial.exists() else 0
-            headers = {"User-Agent": "JanesCriber/0.1"}
+            headers = {"User-Agent": "JanesCriber/1.0"}
             if start:
                 headers["Range"] = f"bytes={start}-"
             request = urllib.request.Request(model_url, headers=headers)
@@ -165,10 +166,9 @@ def load_whisper_model(
     model = whisper_module.load_model(model_name, device="cpu", download_root=str(model_cache))
     check_cancelled(cancel)
     if device != "cpu":
-        if device == "cuda":
-            torch_module.cuda.empty_cache()
+        clear_accelerator_cache(torch_module, device)
         if progress:
             progress(0.42, f"Moving Whisper {model_name} into {device.upper()} memory...")
-        model = model.to(device)
+        model = model.to(resolve_accelerator_device(device, torch_module))
     check_cancelled(cancel)
     return model

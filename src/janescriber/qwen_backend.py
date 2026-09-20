@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .cancellation import CancelCheck, check_cancelled
+from .hardware import clear_accelerator_cache
 
 
 @dataclass(frozen=True)
@@ -85,25 +86,39 @@ def load_qwen_asr_model(model_id: str, model_cache: str | Path, device: str, pro
 
     cache_dir = Path(model_cache).resolve()
     cache_dir.mkdir(parents=True, exist_ok=True)
-    requested = device if device in {"cuda", "mps"} else "cpu"
+    requested = device if device in {"cuda", "xpu", "mps"} else "cpu"
     if requested == "cuda" and not torch.cuda.is_available():
+        requested = "cpu"
+    xpu_backend = getattr(torch, "xpu", None)
+    if requested == "xpu" and (xpu_backend is None or not xpu_backend.is_available()):
         requested = "cpu"
     mps_backend = getattr(torch.backends, "mps", None)
     if requested == "mps" and (mps_backend is None or not mps_backend.is_available()):
         requested = "cpu"
-    dtype = torch.float16 if requested in {"cuda", "mps"} else torch.float32
     if progress:
         progress(0.34, f"Loading {spec.label} on {requested.upper()} (first use downloads into D: project cache)…")
 
-    kwargs: dict[str, Any] = {
-        "cache_dir": str(cache_dir),
-        "dtype": dtype,
-        "max_inference_batch_size": 1,
-        "max_new_tokens": 512,
-    }
-    if requested in {"cuda", "mps"}:
-        kwargs["device_map"] = f"{requested}:0" if requested == "cuda" else requested
-    model = Qwen3ASRModel.from_pretrained(spec.repository, **kwargs)
+    def _load(selected: str):
+        kwargs: dict[str, Any] = {
+            "cache_dir": str(cache_dir),
+            "dtype": torch.float16 if selected in {"cuda", "xpu", "mps"} else torch.float32,
+            "max_inference_batch_size": 1,
+            "max_new_tokens": 512,
+        }
+        if selected in {"cuda", "xpu", "mps"}:
+            kwargs["device_map"] = f"{selected}:0" if selected in {"cuda", "xpu"} else selected
+        return Qwen3ASRModel.from_pretrained(spec.repository, **kwargs)
+
+    try:
+        model = _load(requested)
+    except Exception as exc:
+        if requested == "cpu":
+            raise
+        clear_accelerator_cache(torch, requested)
+        if progress:
+            progress(0.40, f"{requested.upper()} model load was unavailable ({exc}); retrying Qwen3-ASR on CPU…")
+        requested = "cpu"
+        model = _load(requested)
     check_cancelled(cancel)
     if progress:
         progress(0.48, f"Qwen3-ASR ready on {requested.upper()}.")

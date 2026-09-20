@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .cache import cache_key, load, save
-from .hardware import detect_hardware
+from .hardware import clear_accelerator_cache, detect_hardware, resolve_accelerator_device
 from .languages import build_multilingual_prompt, normalize_language_codes
 from .paths import output_path_for
 
@@ -83,7 +83,7 @@ def _ensure_model_downloaded(
     temp_name: str | None = None
     received = 0
     try:
-        request = urllib.request.Request(model_url, headers={"User-Agent": "JanesCriber/0.1"})
+        request = urllib.request.Request(model_url, headers={"User-Agent": "JanesCriber/1.0"})
         with urllib.request.urlopen(request, timeout=30) as response:
             total_header = response.headers.get("Content-Length")
             total = int(total_header) if total_header and total_header.isdigit() else 0
@@ -162,11 +162,10 @@ def transcribe_audio(
                 progress(0.40, f"Constructing Whisper {model_name} safely on CPU before {device.upper()} transfer...")
             model = whisper.load_model(model_name, device="cpu", download_root=str(model_cache))
             if device != "cpu":
-                if device == "cuda":
-                    torch.cuda.empty_cache()
+                clear_accelerator_cache(torch, device)
                 if progress:
                     progress(0.42, f"Moving Whisper {model_name} into {device.upper()} memory...")
-                model = model.to(device)
+                model = model.to(resolve_accelerator_device(device, torch))
             model_result["model"] = model
         except BaseException as exc:
             model_errors.append(exc)

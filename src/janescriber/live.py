@@ -18,7 +18,7 @@ from typing import Any, Callable, Literal
 
 from .cancellation import PipelineAborted
 from .formatting import timestamp
-from .hardware import detect_hardware
+from .hardware import clear_accelerator_cache, detect_hardware
 from .languages import build_multilingual_prompt, normalize_language_codes
 from .model_manager import ensure_model_downloaded, load_whisper_model
 from .pipeline_config import SUPPORTED_ENGINES, SUPPORTED_MODELS
@@ -389,6 +389,7 @@ class LiveTranscriber:
                 if device == "cpu":
                     raise RuntimeError(f"Whisper could not load for live transcription: {exc}") from exc
                 self._emit_status(f"GPU load was unavailable ({exc}); retrying live mode on CPU...")
+                clear_accelerator_cache(torch, device)
                 device = "cpu"
                 model = load_whisper_model(
                     whisper,
@@ -544,7 +545,7 @@ class LiveTranscriber:
             self.on_text(self._render(segments), segments)
 
     def _run_wav2vec2(self, np: Any) -> None:
-        """Run rolling local Wav2Vec2 recognition using CUDA when available."""
+        """Run rolling local Wav2Vec2 recognition using the best local device."""
         hardware = detect_hardware()
         self._emit_status("Loading Wav2Vec2 model for live transcription…")
         session = load_wav2vec2_session(

@@ -373,7 +373,7 @@ class JanesCriberApp(ctk.CTk):
             self.engine_help.configure(text="Vosk / Kaldi runs fully locally without an OpenAI model or cloud API. Choose one supported language.")
             self._sync_vosk_model_for_language(self.model_menu, self.selected_language_codes)
         elif engine == "wav2vec2":
-            self.engine_help.configure(text="Wav2Vec2 is a local GPU-capable English option using the existing Torch runtime. It falls back to CPU.")
+            self.engine_help.configure(text="Wav2Vec2 is a local GPU-capable English option using the available Torch accelerator. It falls back to CPU.")
         elif engine == "qwen3-asr":
             self.engine_help.configure(text="Qwen3-ASR is an optional local multilingual model with Filipino support and GPU acceleration. It uses bounded timestamp blocks; exact word timing remains a Whisper feature.")
         else:
@@ -387,7 +387,7 @@ class JanesCriberApp(ctk.CTk):
             self.live_engine_help.configure(text="Vosk / Kaldi is a lightweight local backend. It uses one language model at a time.")
             self._sync_vosk_model_for_language(self.live_model_menu, self.selected_language_codes)
         elif engine == "wav2vec2":
-            self.live_engine_help.configure(text="Wav2Vec2 is a local GPU-capable English backend. It falls back to CPU when CUDA is unavailable.")
+            self.live_engine_help.configure(text="Wav2Vec2 is a local GPU-capable English backend. It falls back to CPU when the selected accelerator is unavailable.")
         elif engine == "qwen3-asr":
             self.live_engine_help.configure(text="Qwen3-ASR is available for file transcription only. Use Whisper, Vosk, or Wav2Vec2 for live sessions.")
         else:
@@ -408,7 +408,7 @@ class JanesCriberApp(ctk.CTk):
         self.source_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
         self._button(row, "Browse…", self._browse, width=105).pack(side="right")
 
-        options = self._card(self.studio, "2. Transcription settings", "Whisper uses GPU acceleration when available; Vosk / Kaldi is lightweight CPU; Wav2Vec2 adds a local GPU-capable English option.")
+        options = self._card(self.studio, "2. Transcription settings", "Whisper uses the fastest supported local accelerator; Vosk / Kaldi is lightweight CPU; Wav2Vec2 adds a local GPU-capable English option.")
         options.grid(row=1, column=0, sticky="nsew", padx=(0, 12), pady=(0, 12))
         form = ctk.CTkFrame(options, fg_color="transparent")
         form.pack(fill="x", padx=16, pady=(0, 14))
@@ -842,7 +842,7 @@ class JanesCriberApp(ctk.CTk):
         self.pipeline_stage_definitions = [
             ("1. Media Input", "Validate the selected audio or video file"),
             ("2. Audio Extraction", "FFmpeg normalizes a 16 kHz mono speech stream"),
-            ("3. Model & CUDA Load", "Prepare Whisper and move it into accelerator memory"),
+            ("3. Model & Accelerator Load", "Prepare Whisper and move it into accelerator memory"),
             ("4. Whisper Transcription", "Generate speech segments and word-level timestamps"),
             ("5. Timestamp Rendering", "Format the transcript into readable timestamp blocks"),
             ("6. Save & Library", "Write the UTF-8 transcript beside the program"),

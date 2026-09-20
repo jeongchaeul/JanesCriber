@@ -17,7 +17,7 @@ from typing import Any, Callable
 from .cache import cache_key, load, save
 from .cancellation import CancelCheck, PipelineAborted, check_cancelled
 from .formatting import render_text
-from .hardware import detect_hardware
+from .hardware import clear_accelerator_cache, detect_hardware
 from .languages import build_multilingual_prompt
 from .media import MediaInfo, extract_audio, probe_media, validate_media_source
 from .model_manager import ensure_model_downloaded, load_whisper_model
@@ -72,7 +72,7 @@ def run_transcription_job(
     """Run one GUI transcription in an isolated process.
 
     Keeping Whisper in this process is intentional: once it exits, Windows
-    reclaims the CPU model, CUDA staging allocations, and native runtime state
+    reclaims the CPU model, accelerator staging allocations, and native runtime state
     instead of leaving PyTorch's allocator footprint in the long-lived GUI.
     """
     old_stdout = sys.stdout
@@ -228,8 +228,7 @@ def transcribe_audio(
             raise RuntimeError(f"Whisper could not load on CPU: {exc}") from exc
         _report(progress, 0.43, f"GPU load was unavailable ({exc}); retrying safely on CPU...")
         try:
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            clear_accelerator_cache(torch, device)
         except Exception:
             pass
         device = "cpu"
