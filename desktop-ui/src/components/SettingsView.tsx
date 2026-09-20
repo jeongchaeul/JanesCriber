@@ -1,4 +1,5 @@
 import { FolderOpen, Monitor, RotateCcw, Settings2, TerminalSquare } from "lucide-react";
+import type { UpdateStatus } from "../types";
 
 type InterfacePreference = "tauri" | "python";
 
@@ -7,9 +8,12 @@ interface SettingsViewProps {
   onRelaunch: () => void;
   dataDirectory: string;
   onChooseDataDirectory: () => void;
+  updateStatus: UpdateStatus;
+  onCheckForUpdates: () => void;
+  onOpenReleasePage: () => void;
 }
 
-export function SettingsView({ onSelectInterface, onRelaunch, dataDirectory, onChooseDataDirectory }: SettingsViewProps) {
+export function SettingsView({ onSelectInterface, onRelaunch, dataDirectory, onChooseDataDirectory, updateStatus, onCheckForUpdates, onOpenReleasePage }: SettingsViewProps) {
   return (
     <section className="muted-scroll min-h-0 flex-1 overflow-y-auto p-7">
       <div className="mx-auto max-w-4xl space-y-6">
@@ -65,6 +69,28 @@ export function SettingsView({ onSelectInterface, onRelaunch, dataDirectory, onC
             <button type="button" aria-label="Choose data folder" onClick={onChooseDataDirectory} className="subtle-button flex h-9 shrink-0 items-center gap-2 px-3 text-[11px]"><FolderOpen size={14} /> Choose folder</button>
           </div>
           <p className="mt-3 text-[10px] text-[var(--faint)]">Changing this takes effect after relaunch. Existing files are not moved automatically.</p>
+        </section>
+
+        <section className="panel p-5" aria-labelledby="updates-heading">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 id="updates-heading" className="text-[14px] font-semibold text-white">Updates</h2>
+              <p className="mt-2 max-w-2xl text-[11px] leading-5 text-[var(--muted)]">Studio checks the official JanesCriber GitHub Releases page. Your transcripts, models, and selected data folder are not replaced by an update.</p>
+              <p className="mt-3 text-[10px] text-[var(--faint)]" role="status" aria-live="polite">
+                {updateStatus.state === "checking" && "Checking for the latest release…"}
+                {updateStatus.state === "current" && `JanesCriber ${updateStatus.currentVersion} is up to date. Checked ${updateStatus.checkedAt}.`}
+                {updateStatus.state === "available" && `JanesCriber ${updateStatus.latestVersion} is available. Download it from the official release page.`}
+                {updateStatus.state === "not-ready" && `JanesCriber ${updateStatus.latestVersion} exists, but its installer is not published yet.`}
+                {updateStatus.state === "offline" && updateStatus.message}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap justify-end gap-2">
+              <button type="button" aria-label="Check for updates" onClick={onCheckForUpdates} className="subtle-button flex h-9 items-center gap-2 px-3 text-[11px]" disabled={updateStatus.state === "checking"}>
+                <RotateCcw size={14} /> Check for updates
+              </button>
+              {(updateStatus.state === "available" || updateStatus.state === "not-ready") && <button type="button" aria-label="Open JanesCriber release page" onClick={onOpenReleasePage} className="accent-button flex h-9 items-center gap-2 px-3 text-[11px]">Open Releases</button>}
+            </div>
+          </div>
         </section>
       </div>
     </section>

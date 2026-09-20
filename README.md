@@ -48,6 +48,12 @@ does not bundle every vendor's multi-gigabyte accelerator runtime. For
 hardware-tuned CUDA, DirectML, ROCm, XPU, Qwen3-ASR, or specialist developer
 setups, use the developer path below.
 
+Studio checks the official GitHub Releases page when it starts and also has a
+manual **Settings → Updates → Check for updates** action. It only treats a
+published release with a `-Setup.exe` asset as installable. When an update is
+found, Studio opens the official release page so the user can verify and run
+the new installer; it never replaces application files or local data silently.
+
 If Windows displays a SmartScreen warning, verify that the file came from the
 official release page and that its SHA-256 value matches the accompanying
 `.sha256` asset before choosing **More info → Run anyway**. The installer is

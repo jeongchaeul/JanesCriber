@@ -10,6 +10,8 @@ use std::{
 use serde_json::{json, Value};
 use tauri::{Emitter, Manager, State};
 
+const RELEASE_PAGE: &str = "https://github.com/janecerys/JanesCriber/releases";
+
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
@@ -378,6 +380,34 @@ fn set_data_directory(app: tauri::AppHandle, directory: String) -> Result<String
 }
 
 #[tauri::command]
+fn get_app_version(app: tauri::AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
+#[tauri::command]
+fn open_release_page() -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let mut command = Command::new("explorer.exe");
+        configure_background_command(&mut command);
+        command.arg(RELEASE_PAGE).spawn().map_err(|error| format!("Could not open the JanesCriber Releases page: {error}"))?;
+        return Ok(());
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open").arg(RELEASE_PAGE).spawn().map_err(|error| format!("Could not open the JanesCriber Releases page: {error}"))?;
+        return Ok(());
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        Command::new("xdg-open").arg(RELEASE_PAGE).spawn().map_err(|error| format!("Could not open the JanesCriber Releases page: {error}"))?;
+        return Ok(());
+    }
+    #[allow(unreachable_code)]
+    Err("Opening the Releases page is not supported on this platform.".to_owned())
+}
+
+#[tauri::command]
 fn relaunch_launcher(app: tauri::AppHandle, state: State<'_, BackendState>) -> Result<(), String> {
     let data_directory = data_root(&app);
     let resource_directory = resource_root(&app);
@@ -432,7 +462,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(BackendState::default())
-        .invoke_handler(tauri::generate_handler![backend_request, backend_stop, open_path, set_frontend_preference, get_data_directory, set_data_directory, relaunch_launcher])
+        .invoke_handler(tauri::generate_handler![backend_request, backend_stop, open_path, set_frontend_preference, get_data_directory, set_data_directory, get_app_version, open_release_page, relaunch_launcher])
         .build(tauri::generate_context!())
         .expect("error while building JanesCriber Studio")
         .run(|app, event| {

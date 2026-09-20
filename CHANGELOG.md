@@ -2,6 +2,15 @@
 
 All notable JanesCriber changes are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Studio release checking against the official GitHub Releases page, with a
+  manual update action that preserves local application data.
+- A universal consumer installer path alongside the hardware-tuned developer
+  setup path.
+
 ## [1.0.0] - 2026-09-20
 
 ### Added

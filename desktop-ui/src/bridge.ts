@@ -76,3 +76,11 @@ export async function getDataDirectory(): Promise<string> {
 export async function setDataDirectory(directory: string): Promise<string> {
   return invoke<string>("set_data_directory", { directory });
 }
+
+export async function getAppVersion(): Promise<string> {
+  return invoke<string>("get_app_version");
+}
+
+export async function openReleasePage(): Promise<void> {
+  await invoke("open_release_page");
+}

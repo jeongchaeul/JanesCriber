@@ -72,3 +72,10 @@ export interface LogLine {
   tone: "normal" | "success" | "warning" | "error";
   at: string;
 }
+
+export type UpdateStatus =
+  | { state: "checking"; currentVersion: string }
+  | { state: "current"; currentVersion: string; latestVersion: string; checkedAt: string }
+  | { state: "available"; currentVersion: string; latestVersion: string; releaseName: string; checkedAt: string }
+  | { state: "not-ready"; currentVersion: string; latestVersion: string; checkedAt: string }
+  | { state: "offline"; currentVersion: string; message: string };

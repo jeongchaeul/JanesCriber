@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { chooseDataDirectory, getDataDirectory, relaunchLauncher, request, setDataDirectory, setFrontendPreference, stopBackend, subscribe } from "./bridge";
+import { chooseDataDirectory, getAppVersion, getDataDirectory, openReleasePage, relaunchLauncher, request, setDataDirectory, setFrontendPreference, stopBackend, subscribe } from "./bridge";
 import { ConsoleView } from "./components/ConsoleView";
 import { HardwareView } from "./components/HardwareView";
 import { LibraryView } from "./components/LibraryView";
@@ -9,7 +9,8 @@ import { LiveView } from "./components/LiveView";
 import { Sidebar } from "./components/Sidebar";
 import { SettingsView } from "./components/SettingsView";
 import { StudioView } from "./components/StudioView";
-import type { BackendMessage, Bootstrap, LogLine, ViewKey } from "./types";
+import { checkForUpdates } from "./updates";
+import type { BackendMessage, Bootstrap, LogLine, UpdateStatus, ViewKey } from "./types";
 
 const titles: Record<ViewKey, string> = {
   studio: "Transcription Studio",
@@ -32,6 +33,7 @@ export default function App() {
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("Waiting for a transcription request.");
   const [dataDirectory, setDataDirectoryState] = useState("");
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: "checking", currentVersion: "" });
 
   const addLog = useCallback((message: string, tone: LogLine["tone"] = "normal") => {
     setLogs((current) => [...current.slice(-399), { id: Date.now() + current.length, message, tone, at: new Date().toLocaleTimeString() }]);
@@ -57,6 +59,28 @@ export default function App() {
     void getDataDirectory().then((value) => { if (mounted) setDataDirectoryState(value); }).catch((error) => addLog("Could not read the data folder: " + String(error), "error"));
     void request<Bootstrap>("bootstrap").then((value) => { if (mounted) { setBootstrap(value); addLog("JanesCriber Studio ready. Project folder: " + value.projectRoot, "success"); } }).catch((error) => addLog("Local engine is unavailable: " + String(error), "error"));
     return () => { mounted = false; unsubscribe?.(); void stopBackend().catch(() => undefined); };
+  }, [addLog]);
+
+  const onCheckForUpdates = useCallback(async () => {
+    setUpdateStatus((current) => ({ state: "checking", currentVersion: current.currentVersion }));
+    try {
+      const version = await getAppVersion();
+      const result = await checkForUpdates(version);
+      setUpdateStatus(result);
+      if (result.state === "available") addLog(`Update available: JanesCriber ${result.latestVersion}.`, "warning");
+    } catch (error) {
+      setUpdateStatus({ state: "offline", currentVersion: "", message: String(error) });
+    }
+  }, [addLog]);
+
+  useEffect(() => { void onCheckForUpdates(); }, [onCheckForUpdates]);
+
+  const onOpenReleasePage = useCallback(async () => {
+    try {
+      await openReleasePage();
+    } catch (error) {
+      addLog(`Could not open the JanesCriber Releases page: ${String(error)}`, "error");
+    }
   }, [addLog]);
 
   const onBusy = useCallback((value: boolean) => setBusy(value), []);
@@ -105,7 +129,7 @@ export default function App() {
           <motion.div animate={{ opacity: activeView === "live" ? 1 : 0, y: activeView === "live" ? 0 : 4 }} transition={{ duration: .18 }} className={"absolute inset-0 flex h-full min-h-0 " + (activeView === "live" ? "visible" : "invisible pointer-events-none")}><LiveView bootstrap={bootstrap} message={latestMessage} visible={activeView === "live"} onLibraryRefresh={onLibraryRefresh} onLiveState={onLiveState} /></motion.div>
           <motion.div animate={{ opacity: activeView === "hardware" ? 1 : 0, y: activeView === "hardware" ? 0 : 4 }} transition={{ duration: .18 }} className={"absolute inset-0 flex h-full min-h-0 " + (activeView === "hardware" ? "visible" : "invisible pointer-events-none")}><HardwareView bootstrap={bootstrap} active={busy || liveActive} visible={activeView === "hardware"} progress={progress} progressMessage={progressMessage} /></motion.div>
           <motion.div animate={{ opacity: activeView === "console" ? 1 : 0, y: activeView === "console" ? 0 : 4 }} transition={{ duration: .18 }} className={"absolute inset-0 flex h-full min-h-0 " + (activeView === "console" ? "visible" : "invisible pointer-events-none")}><ConsoleView logs={logs} onClear={() => setLogs([])} /></motion.div>
-          <motion.div animate={{ opacity: activeView === "settings" ? 1 : 0, y: activeView === "settings" ? 0 : 4 }} transition={{ duration: .18 }} className={"absolute inset-0 flex h-full min-h-0 " + (activeView === "settings" ? "visible" : "invisible pointer-events-none")}><SettingsView onSelectInterface={onSelectInterface} onRelaunch={onRelaunch} dataDirectory={dataDirectory} onChooseDataDirectory={onChooseDataDirectory} /></motion.div>
+          <motion.div animate={{ opacity: activeView === "settings" ? 1 : 0, y: activeView === "settings" ? 0 : 4 }} transition={{ duration: .18 }} className={"absolute inset-0 flex h-full min-h-0 " + (activeView === "settings" ? "visible" : "invisible pointer-events-none")}><SettingsView onSelectInterface={onSelectInterface} onRelaunch={onRelaunch} dataDirectory={dataDirectory} onChooseDataDirectory={onChooseDataDirectory} updateStatus={updateStatus} onCheckForUpdates={onCheckForUpdates} onOpenReleasePage={onOpenReleasePage} /></motion.div>
         </div>
       </main>
       {!bootstrap && <div className="pointer-events-none fixed bottom-5 right-5 flex items-center gap-2 rounded-lg border border-[var(--line)] bg-[var(--surface-raised)] px-3 py-2 text-[10px] text-[var(--muted)] shadow-xl"><LoaderCircle size={13} className="animate-spin text-[var(--cyan)]" /> Connecting to local engine…</div>}
