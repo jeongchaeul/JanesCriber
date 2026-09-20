@@ -18,6 +18,14 @@ _VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+$")
 _CHECKSUM_PATTERN = re.compile(r"^([0-9a-fA-F]{64})\s+(.+?)\s*$")
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -61,7 +69,7 @@ def validate_release_artifact(
     manifest = Path(manifest_path).resolve() if manifest_path else installer.with_name(installer.name + ".json")
     checksum = Path(checksum_path).resolve() if checksum_path else installer.with_name(installer.name + ".sha256")
     payload = _read_json(manifest)
-    digest = hashlib.sha256(installer.read_bytes()).hexdigest()
+    digest = _sha256_file(installer)
     recorded_digest = _read_checksum(checksum, installer.name)
 
     product = payload.get("product")
