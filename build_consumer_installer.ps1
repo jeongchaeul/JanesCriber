@@ -147,6 +147,23 @@ $manifest = [ordered]@{
 }
 $manifest | ConvertTo-Json | Set-Content -LiteralPath $manifestOutput -Encoding utf8
 
+$validationPython = Join-Path $scriptDir ".venv\Scripts\python.exe"
+if (-not (Test-Path -LiteralPath $validationPython)) {
+    throw "The developer Python environment is required to validate the consumer installer. Run setup.bat first."
+}
+$previousPythonPath = $env:PYTHONPATH
+$env:PYTHONPATH = Join-Path $scriptDir "src"
+try {
+    Invoke-Checked -FilePath $validationPython -ArgumentList @(
+        "-m", "janescriber.release_validation", $setupOutput,
+        "--manifest", $manifestOutput,
+        "--checksum", $hashOutput,
+        "--version", $Version
+    ) -FailureMessage "The consumer release artifact validation failed."
+} finally {
+    $env:PYTHONPATH = $previousPythonPath
+}
+
 Write-Host "Consumer installer: $setupOutput" -ForegroundColor Green
 Write-Host "SHA256: $hash" -ForegroundColor Green
 Write-Host "The developer safety path remains setup.bat + install.ps1." -ForegroundColor Yellow
