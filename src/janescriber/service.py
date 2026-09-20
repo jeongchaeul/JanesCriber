@@ -33,7 +33,7 @@ from .live import (
 )
 from .paths import project_dir, runtime_paths
 from .pipeline import run_transcription_job
-from .pipeline_config import SUPPORTED_ENGINES, SUPPORTED_MODELS
+from .pipeline_config import OUTPUT_FORMAT_LABELS, SUPPORTED_ENGINES, SUPPORTED_MODELS
 from .qwen_backend import QWEN_MODEL_LABELS
 from .runtime import configure_runtime
 from .vosk_backend import VOSK_MODEL_LABELS
@@ -101,6 +101,7 @@ class JsonLinesService:
             "tempRoot": str(self.paths["temp"]),
             "hardware": detect_hardware(),
             "engines": list(SUPPORTED_ENGINES),
+            "outputFormats": [{"id": key, "label": label} for key, label in OUTPUT_FORMAT_LABELS.items()],
             "models": {
                 "whisper": [{"id": value, "label": value.title()} for value in SUPPORTED_MODELS],
                 "qwen3-asr": [{"id": key, "label": label} for key, label in QWEN_MODEL_LABELS.items()],

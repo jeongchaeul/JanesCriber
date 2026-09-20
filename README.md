@@ -145,8 +145,9 @@ more important, which keeps the standard Torch runtime instead.
    show download, model-load, accelerator, and transcription progress.
 4. The recognizer produces timestamped segments. Whisper also produces
    word-level timing information when available.
-5. JanesCriber renders a readable text file and publishes it atomically in
-   `Transcripts`.
+5. JanesCriber renders the selected export format and publishes it atomically
+   in `Transcripts`. TXT is the default; SRT, VTT, and JSON are available for
+   subtitle and integration workflows.
 6. The file appears in **Transcript Library**, where it can be read, opened in
    Explorer, or deleted.
 
@@ -168,6 +169,8 @@ explicitly want replacement.
   Tagalog/Filipino and can be searched by language name, native name, or code.
 - **Transcript Library** — Manage and read generated transcripts inside the
   application without opening a separate viewer window.
+- **Local export formats** — Keep the readable TXT default or generate SRT,
+  VTT, and structured JSON segment files beside it in `Transcripts`.
 - **Live console and pipeline tracker** — See what the worker is doing when a
   model takes time to load or a device needs a fallback.
 - **Project-local data** — Outputs, model caches, scratch files, and logs are
@@ -263,13 +266,18 @@ Live sessions continuously write timestamped text into `Transcripts` and make
 the finished file available in **Transcript Library**. Stop and save before
 closing the application so the final segment is flushed.
 
+If recognition cannot keep up with the selected capture source, JanesCriber
+keeps the audio queue bounded to protect memory and reports the number of
+dropped buffered chunks in the live notes and console. Use Whisper `tiny`,
+`base`, or Vosk for long sessions when this warning appears.
+
 ## Storage and C: drive protection
 
 When the project or portable folder is on `D:`, JanesCriber uses these paths:
 
 ```text
 JanesCriber\
-├─ Transcripts\             Completed .txt files, including live sessions
+├─ Transcripts\             Completed .txt/.srt/.vtt/.json files, including live sessions
 ├─ .cache\
 │  ├─ whisper\              Whisper model weights
 │  ├─ vosk\                 Vosk/Kaldi model files
@@ -374,6 +382,11 @@ JanesCriber-1.0.0-Setup.exe.sha256
 JanesCriber-1.0.0-Setup.exe.json
 ```
 
+The packaging script validates that the installer, manifest version, bundled
+FFmpeg declaration, and SHA-256 files all match before it reports success.
+The repository also checks that the Python, npm, Tauri, and Cargo version
+metadata stay consistent.
+
 Qwen3-ASR and hardware-specific CUDA/ROCm/XPU/DirectML package variants remain
 opt-in through the developer build path. Use `setup.bat` when you want the
 largest hardware-tuned runtime and model choices; use the one-file installer
@@ -441,6 +454,13 @@ the active speaker or headset. For application output, select a visible window
 that is playing sound and refresh the source list. If the console reports that
 ProcTap or an audio package is missing, run `setup.bat` again.
 
+### Live transcription reports a full audio buffer
+
+The recognizer is slower than the selected audio source. This is a protective
+warning rather than an unbounded-memory failure. Stop and save the session,
+then retry with Whisper `tiny`/`base`, Vosk, a shorter session, or a less
+expensive capture source.
+
 ### C: is filling up
 
 Place the checkout or portable folder on the desired drive before setup and
@@ -467,8 +487,13 @@ Run the tests from the project folder with the project interpreter:
 The suite covers output naming, timestamp formatting, cache validation, media
 handling, cancellation, cleanup, language selection, live-capture helpers,
 hardware selection, library behavior, launcher preferences, and local runtime
-paths. A real audio/video smoke test should still be performed on the target
+paths, export formats, release artifacts, version consistency, and live
+backpressure diagnostics. A real audio/video smoke test should still be performed on the target
 machine because GPU drivers, codecs, permissions, and audio devices vary.
+
+Every push and pull request also runs the Windows quality-gate workflow for
+Python tests/compile checks, version consistency, the frontend tests/build,
+production dependency audit, and Tauri/Rust source compilation.
 
 ## Project documentation
 

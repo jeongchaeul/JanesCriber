@@ -39,3 +39,38 @@ client of that pipeline.
   backend is present.
 - No generated artifacts or model weights are committed.
 
+## Post-v1 improvement wave
+
+The next work is focused on making the existing product safer to release and
+more dependable for ordinary users before adding additional model families.
+
+### Slice A: Release confidence
+
+- Add CI checks for Python, frontend, and Tauri source health. **Done:**
+  `.github/workflows/ci.yml` runs the cross-layer gates.
+- Add a release-artifact validator for installer manifests and SHA-256 files.
+  **Done:** the validator is also enforced by the consumer build script.
+- Document the exact separation between source builds, portable ZIPs, and the
+  consumer installer.
+
+### Slice B: Backend reliability
+
+- Add visible live-capture backpressure reporting instead of silently dropping
+  audio when the bounded queue is saturated. **Done:** drops are bounded,
+  counted, throttled, and surfaced to the live console.
+- Add reproducible model metadata and safer external-download diagnostics.
+- Add regression coverage for the new diagnostics. **Done:** release, live,
+  format, library, and version checks are covered by the Python suite.
+
+### Slice C: Consumer workflow
+
+- Add first-class export formats only where the existing transcript contract can
+  support them without breaking the default TXT output. **Done:** TXT, SRT,
+  VTT, and JSON are shared by the modern and legacy launchers.
+- Keep the default local/private behavior and legacy recovery path unchanged.
+
+### Slice D: Release gate
+
+- Run all local checks and record any unavailable environment checks honestly.
+- Rebuild the packaged installer only after the Rust toolchain is available.
+- Perform clean-machine install, upgrade, live capture, and uninstall checks.

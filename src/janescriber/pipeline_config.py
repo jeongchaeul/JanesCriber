@@ -13,6 +13,12 @@ from .qwen_backend import QWEN_MODEL_SPECS, QWEN_SUPPORTED_CODES
 SUPPORTED_ENGINES = ("whisper", "vosk", "wav2vec2", "qwen3-asr")
 SUPPORTED_MODELS = ("turbo", "large-v3", "medium", "small", "base", "tiny")
 SUPPORTED_OUTPUT_FORMATS = ("txt", "srt", "vtt", "json")
+OUTPUT_FORMAT_LABELS = {
+    "txt": "TXT · readable transcript",
+    "srt": "SRT · subtitles",
+    "vtt": "VTT · web subtitles",
+    "json": "JSON · segments and words",
+}
 
 
 @dataclass(frozen=True)

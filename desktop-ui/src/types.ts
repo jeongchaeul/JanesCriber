@@ -19,6 +19,7 @@ export interface Bootstrap {
   tempRoot: string;
   hardware: Record<string, string | number | boolean>;
   engines: EngineId[];
+  outputFormats: ModelOption[];
   models: Record<EngineId, ModelOption[]>;
   languages: LanguageOption[];
 }
