@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { CheckCircle2, FileAudio, FolderOpen, Play, Square, TerminalSquare, UploadCloud } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { chooseMedia, openManagedPath, request } from "../bridge";
-import type { BackendMessage, Bootstrap, EngineId, LogLine } from "../types";
+import type { BackendMessage, Bootstrap, EngineId, LogLine, OutputFormat } from "../types";
 import { LanguagePicker } from "./LanguagePicker";
 
 const stages = [
@@ -27,6 +27,7 @@ export function StudioView({ bootstrap, logs, message, onBusy, onProgress, onLib
   const [languages, setLanguages] = useState<string[]>([]);
   const [overwrite, setOverwrite] = useState(false);
   const [useCache, setUseCache] = useState(true);
+  const [outputFormat, setOutputFormat] = useState<OutputFormat>("txt");
   const [busy, setBusy] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
@@ -110,6 +111,7 @@ export function StudioView({ bootstrap, logs, message, onBusy, onProgress, onLib
         languages,
         overwrite,
         useCache,
+        outputFormat,
       });
       setJobId(result.jobId);
     } catch (caught) {
@@ -165,6 +167,7 @@ export function StudioView({ bootstrap, logs, message, onBusy, onProgress, onLib
               <label className="space-y-2"><span className="field-label">Model</span><select value={selectedModel} onChange={(event) => setModel(event.target.value)} className="field w-full px-3 text-[12px]">{models.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
             </div>
             <div className="mt-4 space-y-2"><span className="field-label">Languages</span><LanguagePicker options={bootstrap?.languages || []} value={languages} onChange={setLanguages} /></div>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2"><label className="space-y-2"><span className="field-label">Output format</span><select aria-label="Transcript output format" value={outputFormat} onChange={(event) => setOutputFormat(event.target.value as OutputFormat)} className="field w-full px-3 text-[12px]"><option value="txt">TXT · readable transcript</option><option value="srt">SRT · subtitles</option><option value="vtt">VTT · web subtitles</option><option value="json">JSON · segments and words</option></select></label><div className="flex items-end text-[10px] leading-4 text-[var(--faint)]">All formats are saved locally in the Transcripts folder. TXT remains the default.</div></div>
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-3">
               <label className="flex items-center gap-2 text-[11px] text-[var(--muted)]"><input type="checkbox" checked={overwrite} onChange={(event) => setOverwrite(event.target.checked)} className="accent-[var(--pink)]" /> Overwrite same-name transcript</label>
               <label className="flex items-center gap-2 text-[11px] text-[var(--muted)]"><input type="checkbox" checked={useCache} onChange={(event) => setUseCache(event.target.checked)} className="accent-[var(--cyan)]" /> Use local transcript cache</label>

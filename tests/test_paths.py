@@ -32,3 +32,13 @@ def test_explicit_program_output_directory(tmp_path: Path):
     source.write_bytes(b"video")
     program_dir = tmp_path / "JanesCriber"
     assert output_path_for(source, output_dir=program_dir).parent == program_dir
+
+
+def test_output_path_supports_safe_export_extensions(tmp_path: Path):
+    source = tmp_path / "media" / "clip.mp4"
+    source.parent.mkdir()
+    source.write_bytes(b"media")
+
+    output = output_path_for(source, output_dir=tmp_path / "Transcripts", extension="srt")
+
+    assert output.name == "clip.srt"

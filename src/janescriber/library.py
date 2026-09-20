@@ -6,6 +6,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+SUPPORTED_TRANSCRIPT_SUFFIXES = frozenset({".txt", ".srt", ".vtt", ".json"})
+
+
 @dataclass(frozen=True)
 class TranscriptEntry:
     path: Path
@@ -18,8 +21,8 @@ def discover_transcripts(program_dir: str | Path) -> list[TranscriptEntry]:
     base = Path(program_dir).resolve()
     entries: list[TranscriptEntry] = []
     try:
-        for path in base.glob("*.txt"):
-            if not path.is_file() or path.name.startswith("."):
+        for path in base.iterdir():
+            if not path.is_file() or path.name.startswith(".") or path.suffix.lower() not in SUPPORTED_TRANSCRIPT_SUFFIXES:
                 continue
             try:
                 stat = path.stat()
@@ -35,7 +38,7 @@ def is_managed_transcript(path: str | Path, program_dir: str | Path) -> bool:
     """Allow library actions only for .txt files directly in the app folder."""
     candidate = Path(path).resolve()
     base = Path(program_dir).resolve()
-    return candidate.is_file() and candidate.suffix.lower() == ".txt" and candidate.parent == base
+    return candidate.is_file() and candidate.suffix.lower() in SUPPORTED_TRANSCRIPT_SUFFIXES and candidate.parent == base
 
 
 def read_transcript(path: str | Path, program_dir: str | Path) -> str:

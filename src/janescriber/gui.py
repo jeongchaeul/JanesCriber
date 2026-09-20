@@ -60,6 +60,7 @@ THEME = {
 
 ASR_ENGINE_OPTIONS = ["Whisper (OpenAI)", "Qwen3-ASR (multilingual)", "Vosk / Kaldi (local)", "Wav2Vec2 (GPU-capable)"]
 WHISPER_MODEL_OPTIONS = ["turbo", "large-v3", "medium", "small", "base", "tiny"]
+OUTPUT_FORMAT_OPTIONS = ["TXT · readable transcript", "SRT · subtitles", "VTT · web subtitles", "JSON · segments and words"]
 
 
 class ConsoleRedirector:
@@ -339,6 +340,14 @@ class JanesCriberApp(ctk.CTk):
                 return model_id
         return value
 
+    @staticmethod
+    def _output_format_id(menu) -> str:
+        value = str(menu.get()).lower()
+        for output_format in ("txt", "srt", "vtt", "json"):
+            if value.startswith(output_format):
+                return output_format
+        return "txt"
+
     def _configure_asr_model_menu(self, menu, engine: str, *, default: str | None = None) -> None:
         if engine == "vosk":
             values = list(VOSK_MODEL_LABELS.values())
@@ -400,7 +409,7 @@ class JanesCriberApp(ctk.CTk):
         self.studio.grid_columnconfigure(1, weight=2)
         self.studio.grid_rowconfigure(2, weight=1)
 
-        source = self._card(self.studio, "1. Choose audio or video", "Every format FFmpeg can read is accepted. Drop a file anywhere on this window or use Browse. The .txt result is written in JanesCriber\\Transcripts.")
+        source = self._card(self.studio, "1. Choose audio or video", "Every format FFmpeg can read is accepted. Drop a file anywhere on this window or use Browse. The selected result is written in JanesCriber\\Transcripts.")
         source.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
         row = ctk.CTkFrame(source, fg_color="transparent")
         row.pack(fill="x", padx=16, pady=(0, 15))
@@ -456,10 +465,20 @@ class JanesCriberApp(ctk.CTk):
             command=self._open_multi_language_modal,
         )
         self.custom_language_button.grid(row=0, column=1, sticky="e")
+        ctk.CTkLabel(form, text="Output format", text_color=THEME["muted"]).grid(row=4, column=0, sticky="w", pady=7)
+        self.output_format_menu = ctk.CTkOptionMenu(
+            form,
+            values=OUTPUT_FORMAT_OPTIONS,
+            fg_color=THEME["input"],
+            button_color=THEME["glow"],
+            button_hover_color=THEME["cyan"],
+        )
+        self.output_format_menu.set(OUTPUT_FORMAT_OPTIONS[0])
+        self.output_format_menu.grid(row=4, column=1, sticky="ew", padx=(18, 0), pady=4)
         self.overwrite = ctk.BooleanVar(value=False)
         self.cache = ctk.BooleanVar(value=True)
-        ctk.CTkCheckBox(form, text="Overwrite same-name .txt", variable=self.overwrite, text_color=THEME["muted"], fg_color=THEME["magenta"], hover_color=THEME["magenta_hover"]).grid(row=4, column=0, columnspan=2, sticky="w", pady=(9, 2))
-        ctk.CTkCheckBox(form, text="Use local transcript cache", variable=self.cache, text_color=THEME["muted"], fg_color=THEME["cyan"], hover_color=THEME["cyan_hover"]).grid(row=5, column=0, columnspan=2, sticky="w", pady=2)
+        ctk.CTkCheckBox(form, text="Overwrite same-name output", variable=self.overwrite, text_color=THEME["muted"], fg_color=THEME["magenta"], hover_color=THEME["magenta_hover"]).grid(row=5, column=0, columnspan=2, sticky="w", pady=(9, 2))
+        ctk.CTkCheckBox(form, text="Use local transcript cache", variable=self.cache, text_color=THEME["muted"], fg_color=THEME["cyan"], hover_color=THEME["cyan_hover"]).grid(row=6, column=0, columnspan=2, sticky="w", pady=2)
 
         action = self._card(self.studio, "3. Generate transcript", "")
         action.grid(row=1, column=1, sticky="nsew", pady=(0, 12))
@@ -1315,8 +1334,9 @@ class JanesCriberApp(ctk.CTk):
         self._log(f"Transcription requested: {Path(source).resolve()}")
         engine = self._engine_id(self.engine_menu)
         model = self._model_id(self.model_menu)
+        output_format = self._output_format_id(self.output_format_menu)
         self._log(f"ASR engine: {engine} | Model: {model} | Language: {self.language_menu.get()}")
-        self._log(f"Transcript cache: {'enabled' if self.cache.get() else 'disabled'} | Output: {self.paths['transcripts']}")
+        self._log(f"Transcript cache: {'enabled' if self.cache.get() else 'disabled'} | Format: {output_format.upper()} | Output: {self.paths['transcripts']}")
         self.start_button.configure(state="disabled")
         self.cancel_button.configure(state="normal")
         self.sidebar_status.configure(text="● TRANSCRIBING", text_color=THEME["yellow"])
@@ -1330,6 +1350,7 @@ class JanesCriberApp(ctk.CTk):
                 "engine": engine,
                 "model_name": model,
                 "language": language,
+                "output_format": output_format,
                 "paths": self.paths,
                 "overwrite": bool(self.overwrite.get()),
                 "use_cache": bool(self.cache.get()),

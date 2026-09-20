@@ -9,7 +9,7 @@ from pathlib import Path
 
 from janescriber.pipeline import transcribe_media
 from janescriber.paths import project_dir, runtime_paths
-from janescriber.pipeline_config import SUPPORTED_ENGINES, validate_transcription_request
+from janescriber.pipeline_config import SUPPORTED_ENGINES, SUPPORTED_OUTPUT_FORMATS, validate_transcription_request
 from janescriber.runtime import configure_runtime
 from janescriber.single_instance import acquire_gui_instance
 from janescriber.launcher import FRONTEND_MAIN, launch_main_ui, read_frontend_preference, find_main_ui
@@ -23,6 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--language", default=None, help="Language code, or omit for auto-detection")
     parser.add_argument("--overwrite", action="store_true", help="Replace an existing transcript in the Transcripts folder")
     parser.add_argument("--no-cache", action="store_true", help="Run the selected engine again even when a cached transcript exists")
+    parser.add_argument("--format", dest="output_format", default="txt", choices=SUPPORTED_OUTPUT_FORMATS, help="Transcript output format: TXT, SRT, VTT, or JSON")
     parser.add_argument("--gui", action="store_true", help="Open the desktop console")
     parser.add_argument("--service", action="store_true", help="Run the JSON-lines bridge used by JanesCriber Studio")
     return parser
@@ -54,6 +55,7 @@ def main(argv: list[str] | None = None) -> int:
             language=args.language,
             overwrite=args.overwrite,
             use_cache=not args.no_cache,
+            output_format=args.output_format,
         )
         configure_runtime(project_dir())
         paths = runtime_paths()
@@ -62,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
             engine=config.engine,
             model_name=config.model_name,
             language=config.language_arg,
+            output_format=config.output_format,
             paths=paths,
             overwrite=config.overwrite,
             use_cache=config.use_cache,

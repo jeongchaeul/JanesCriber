@@ -25,3 +25,13 @@ def test_library_actions_are_scoped_to_program_folder(tmp_path: Path):
     with pytest.raises(ValueError):
         read_transcript(outside, tmp_path)
 
+
+def test_library_discovers_supported_export_formats(tmp_path: Path):
+    (tmp_path / "captions.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nHello\n", encoding="utf-8")
+    (tmp_path / "captions.vtt").write_text("WEBVTT\n", encoding="utf-8")
+    (tmp_path / "captions.json").write_text("{}", encoding="utf-8")
+
+    names = {item.path.name for item in discover_transcripts(tmp_path)}
+
+    assert names == {"captions.srt", "captions.vtt", "captions.json"}
+    assert is_managed_transcript(tmp_path / "captions.srt", tmp_path)

@@ -12,6 +12,7 @@ from .qwen_backend import QWEN_MODEL_SPECS, QWEN_SUPPORTED_CODES
 
 SUPPORTED_ENGINES = ("whisper", "vosk", "wav2vec2", "qwen3-asr")
 SUPPORTED_MODELS = ("turbo", "large-v3", "medium", "small", "base", "tiny")
+SUPPORTED_OUTPUT_FORMATS = ("txt", "srt", "vtt", "json")
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,7 @@ class TranscriptionConfig:
     language: tuple[str, ...] = ()
     overwrite: bool = False
     use_cache: bool = True
+    output_format: str = "txt"
 
     def __post_init__(self) -> None:
         engine = str(self.engine).strip().lower()
@@ -72,6 +74,13 @@ class TranscriptionConfig:
         object.__setattr__(self, "language", languages)
         object.__setattr__(self, "overwrite", bool(self.overwrite))
         object.__setattr__(self, "use_cache", bool(self.use_cache))
+        output_format = str(self.output_format).strip().lower().lstrip(".")
+        if output_format not in SUPPORTED_OUTPUT_FORMATS:
+            raise ValueError(
+                f"Unsupported transcript format '{self.output_format}'. "
+                f"Choose from: {', '.join(SUPPORTED_OUTPUT_FORMATS)}"
+            )
+        object.__setattr__(self, "output_format", output_format)
 
     @property
     def language_arg(self) -> str | None:
@@ -85,6 +94,7 @@ def validate_transcription_request(
     *,
     overwrite: bool = False,
     use_cache: bool = True,
+    output_format: str = "txt",
 ) -> TranscriptionConfig:
     """Validate all user-controlled options before creating runtime state."""
     return TranscriptionConfig(
@@ -93,4 +103,5 @@ def validate_transcription_request(
         language=tuple(normalize_language_codes(language)),
         overwrite=overwrite,
         use_cache=use_cache,
+        output_format=output_format,
     )

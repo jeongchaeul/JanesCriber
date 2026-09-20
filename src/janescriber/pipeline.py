@@ -16,7 +16,7 @@ from typing import Any, Callable
 
 from .cache import cache_key, load, save
 from .cancellation import CancelCheck, PipelineAborted, check_cancelled
-from .formatting import render_text
+from .formatting import render_transcript
 from .hardware import clear_accelerator_cache, detect_hardware
 from .languages import build_multilingual_prompt
 from .media import MediaInfo, extract_audio, probe_media, validate_media_source
@@ -63,6 +63,7 @@ def run_transcription_job(
     engine: str = "whisper",
     model_name: str,
     language: str | None,
+    output_format: str = "txt",
     paths: dict[str, Path],
     overwrite: bool,
     use_cache: bool,
@@ -90,6 +91,7 @@ def run_transcription_job(
             engine=engine,
             model_name=model_name,
             language=language,
+            output_format=output_format,
             paths=paths,
             overwrite=overwrite,
             use_cache=use_cache,
@@ -302,6 +304,7 @@ def transcribe_media(
     engine: str = "whisper",
     model_name: str = "turbo",
     language: str | list[str] | tuple[str, ...] | None = None,
+    output_format: str = "txt",
     paths: dict[str, Path],
     overwrite: bool = False,
     use_cache: bool = True,
@@ -315,6 +318,7 @@ def transcribe_media(
         language=language,
         overwrite=overwrite,
         use_cache=use_cache,
+        output_format=output_format,
     )
     source_path = validate_media_source(source)
     check_cancelled(cancel)
@@ -324,7 +328,12 @@ def transcribe_media(
         raise RuntimeError("This media file does not contain an audio stream.")
     _report(progress, 0.12, f"Media ready: {media.path.name} ({media.duration_seconds or 0:.1f}s)")
 
-    output_path = output_path_for(source_path, output_dir=paths["transcripts"], overwrite=config.overwrite)
+    output_path = output_path_for(
+        source_path,
+        output_dir=paths["transcripts"],
+        overwrite=config.overwrite,
+        extension=config.output_format,
+    )
     key = cache_key(source_path, f"{config.engine}:{config.model_name}", config.language_arg)
     job_dir = _job_directory(paths)
     try:
@@ -355,10 +364,10 @@ def transcribe_media(
                     _report(progress, 0.76, "Transcript complete; cache could not be written, continuing safely.")
 
         check_cancelled(cancel)
-        _report(progress, 0.85, "Rendering timestamped text transcript...")
+        _report(progress, 0.85, f"Rendering {config.output_format.upper()} transcript...")
         published = _publish_transcript(
             output_path,
-            render_text(data, source_path.name, f"{config.engine.title()}: {config.model_name}"),
+            render_transcript(data, source_path.name, f"{config.engine.title()}: {config.model_name}", config.output_format),
         )
         _report(progress, 1.0, f"Transcript saved in Transcripts: {published.name}")
         return published

@@ -36,17 +36,26 @@ def runtime_paths() -> dict[str, Path]:
     return configure_runtime(project_dir())
 
 
-def output_path_for(source: str | Path, *, output_dir: str | Path | None = None, overwrite: bool = False) -> Path:
+def output_path_for(
+    source: str | Path,
+    *,
+    output_dir: str | Path | None = None,
+    overwrite: bool = False,
+    extension: str = "txt",
+) -> Path:
     source_path = Path(source).resolve()
     stem = re.sub(r"[^A-Za-z0-9._ -]+", "_", source_path.stem).strip(" .") or "transcription"
+    extension = str(extension).strip().lower().lstrip(".")
+    if not re.fullmatch(r"[a-z0-9]+", extension):
+        raise ValueError("Transcript extension must contain letters or numbers only.")
     destination = Path(output_dir).resolve() if output_dir else source_path.parent
     destination.mkdir(parents=True, exist_ok=True)
-    candidate = destination / f"{stem}.txt"
+    candidate = destination / f"{stem}.{extension}"
     if overwrite or not candidate.exists():
         return candidate
     index = 2
     while True:
-        candidate = destination / f"{stem} ({index}).txt"
+        candidate = destination / f"{stem} ({index}).{extension}"
         if not candidate.exists():
             return candidate
         index += 1

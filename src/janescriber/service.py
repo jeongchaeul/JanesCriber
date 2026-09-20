@@ -177,6 +177,7 @@ class JsonLinesService:
                 "engine": str(payload.get("engine") or "whisper"),
                 "model_name": str(payload.get("model") or "turbo"),
                 "language": ",".join(str(value) for value in (payload.get("languages") or [])) or None,
+                "output_format": str(payload.get("outputFormat") or "txt"),
                 "paths": self.paths,
                 "overwrite": bool(payload.get("overwrite", False)),
                 "use_cache": bool(payload.get("useCache", True)),

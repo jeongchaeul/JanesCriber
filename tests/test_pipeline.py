@@ -64,6 +64,28 @@ def test_pipeline_rejects_media_without_audio(tmp_path: Path, monkeypatch):
         raise AssertionError("silent media should be rejected before job creation")
 
 
+def test_pipeline_publishes_selected_export_format(tmp_path: Path, monkeypatch):
+    source = tmp_path / "meeting.mp4"
+    source.write_bytes(b"source media")
+    paths = configure_runtime(tmp_path)
+    monkeypatch.setattr(
+        pipeline,
+        "probe_media",
+        lambda source, cancel=None: MediaInfo(Path(source).resolve(), 12, 3.0, True, True),
+    )
+    monkeypatch.setattr(pipeline, "extract_audio", lambda source, destination, cancel=None: Path(destination).write_bytes(b"wav data") or Path(destination))
+    monkeypatch.setattr(
+        pipeline,
+        "transcribe_audio",
+        lambda *args, **kwargs: {"text": "hello", "segments": [{"start": 0, "end": 1, "text": "hello"}], "words": [], "language": "en"},
+    )
+
+    output = pipeline.transcribe_media(source, paths=paths, use_cache=False, output_format="srt")
+
+    assert output.name == "meeting.srt"
+    assert output.read_text(encoding="utf-8").startswith("1\n00:00:00,000 --> 00:00:01,000\nhello")
+
+
 def test_isolated_worker_reports_progress_and_completion(tmp_path: Path, monkeypatch):
     source = tmp_path / "meeting.mp4"
     source.write_bytes(b"source media")

@@ -1,5 +1,6 @@
 export type ViewKey = "studio" | "library" | "live" | "hardware" | "console" | "settings";
 export type EngineId = "whisper" | "qwen3-asr" | "vosk" | "wav2vec2";
+export type OutputFormat = "txt" | "srt" | "vtt" | "json";
 
 export interface LanguageOption {
   code: string;
