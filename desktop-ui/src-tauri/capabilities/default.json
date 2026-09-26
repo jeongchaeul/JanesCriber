@@ -4,9 +4,7 @@
   "description": "Minimal capability set for the JanesCriber Studio window",
   "windows": ["main"],
   "permissions": [
-    "core:app:default",
-    "core:event:default",
-    "core:window:default",
+    "core:default",
     "dialog:default"
   ]
 }

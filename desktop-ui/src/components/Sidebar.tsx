@@ -1,5 +1,5 @@
-import { AnimatePresence, motion } from "framer-motion";
-import { AudioLines, ChevronLeft, ChevronRight, Cpu, FolderOpen, Radio, Settings2, TerminalSquare } from "lucide-react";
+import { Activity, AudioLines, Cpu, FolderOpen, PanelLeftClose, PanelLeftOpen, Radio, Settings2, TerminalSquare } from "lucide-react";
+import { motion } from "framer-motion";
 import type { ViewKey } from "../types";
 
 const items: Array<{ key: ViewKey; label: string; icon: typeof AudioLines }> = [
@@ -11,71 +11,132 @@ const items: Array<{ key: ViewKey; label: string; icon: typeof AudioLines }> = [
   { key: "settings", label: "Settings", icon: Settings2 },
 ];
 
-export function Sidebar({ activeView, collapsed, onChange, onToggle }: { activeView: ViewKey; collapsed: boolean; onChange: (view: ViewKey) => void; onToggle: () => void }) {
+export function Sidebar({
+  activeView,
+  collapsed,
+  onChange,
+  onToggle,
+  busy = false,
+  liveActive = false,
+}: {
+  activeView: ViewKey;
+  collapsed: boolean;
+  onChange: (view: ViewKey) => void;
+  onToggle: () => void;
+  busy?: boolean;
+  liveActive?: boolean;
+}) {
   return (
     <motion.aside
-      animate={{ width: collapsed ? 76 : 258 }}
+      data-collapsed={collapsed}
+      animate={{ width: collapsed ? 76 : 232 }}
       transition={{ type: "spring", stiffness: 420, damping: 38 }}
-      className="relative z-10 flex h-full shrink-0 flex-col border-r border-[var(--line)] bg-[rgba(8,8,16,.82)]"
+      className="relative z-10 flex shrink-0 flex-col overflow-hidden border-r border-white/[0.06] bg-[#05040d]/85 px-4 py-5 backdrop-blur-xl"
     >
-      <div className="flex h-16 items-center justify-between border-b border-[var(--line)] px-4">
-        <AnimatePresence initial={false}>
-          {!collapsed && (
-            <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--faint)]">
-              Workspace
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <button type="button" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={onToggle} className="subtle-button ml-auto grid h-8 w-8 place-items-center">
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </button>
-      </div>
-      <div className="muted-scroll min-h-0 flex-1 overflow-y-auto">
-      <div className="px-3 py-5">
-        <div className={collapsed ? "flex justify-center" : "flex items-center gap-3 px-2"}>
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-300/[.08] text-cyan-200">
-            <AudioLines size={23} strokeWidth={1.7} />
-          </div>
-          <AnimatePresence initial={false}>
-            {!collapsed && (
-              <motion.div initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: "auto" }} exit={{ opacity: 0, width: 0 }} className="overflow-hidden whitespace-nowrap">
-                <div className="text-[16px] font-semibold tracking-tight text-white">JanesCriber</div>
-                <div className="mt-1 text-[9px] font-semibold uppercase tracking-[.16em] text-cyan-300/80">JANE MEDIA SUITE</div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+      {/* Brand Header with Glowing Accent Orb (JaneConverter Parity) */}
+      <div className={["flex min-h-9 items-center gap-3", collapsed ? "justify-center" : "justify-start"].join(" ")}>
+        <div className="grid size-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-[#11101b] shadow-[0_8px_24px_rgba(0,0,0,.28)]">
+          <span
+            className="size-2 rounded-full"
+            style={{
+              backgroundColor: "var(--accent-color, #c52b68)",
+              boxShadow: "0 0 14px var(--accent-glow, rgba(197,43,104,.55))",
+            }}
+          />
         </div>
+        {!collapsed && (
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold tracking-tight text-white">JanesCriber</div>
+            <div className="mono-label mt-0.5">LOCAL / STUDIO</div>
+          </div>
+        )}
       </div>
-      <nav aria-label="Workspace navigation" className="flex flex-col gap-1 px-3">
+
+      {!collapsed && <div className="mono-label mt-8 px-3">Workspace</div>}
+
+      {/* Navigation list with smooth layoutId animation */}
+      <nav className="mt-3 flex-1 space-y-1" aria-label="Primary">
         {items.map(({ key, label, icon: Icon }) => {
           const active = activeView === key;
           return (
             <button
-              type="button"
               key={key}
+              type="button"
               aria-current={active ? "page" : undefined}
-              aria-label={collapsed ? label : undefined}
+              aria-label={label}
               title={collapsed ? label : undefined}
               onClick={() => onChange(key)}
-              className={"group relative flex h-11 items-center gap-3 rounded-lg px-3 text-left text-[12px] transition-colors " + (active ? "bg-white/[.06] text-white" : "text-[var(--muted)] hover:bg-white/[.035] hover:text-white")}
+              className={[
+                "group relative flex w-full items-center rounded-xl py-2.5 text-left text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b82f6]",
+                collapsed ? "justify-center px-2" : "gap-3 px-3",
+                active ? "text-white" : "text-zinc-500 hover:bg-white/[0.035] hover:text-zinc-200",
+              ].join(" ")}
             >
-              <span className={"absolute left-0 h-5 w-[2px] rounded-full transition-opacity " + (active ? "bg-[var(--pink)] opacity-100" : "bg-transparent opacity-0")} />
-              <Icon size={16} strokeWidth={active ? 2 : 1.7} className={active ? "text-[var(--pink)]" : "text-[var(--faint)] group-hover:text-[var(--muted)]"} />
-              <AnimatePresence initial={false}>
-                {!collapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="whitespace-nowrap">{label}</motion.span>}
-              </AnimatePresence>
+              {active && (
+                <motion.span
+                  layoutId="active-nav"
+                  className="absolute inset-0 rounded-xl border bg-white/[0.045]"
+                  style={{ borderColor: "var(--accent-glow, rgba(197,43,104,0.35))" }}
+                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                />
+              )}
+              <Icon
+                className={["relative z-10 size-4", active ? "" : "text-zinc-600 group-hover:text-zinc-300"].join(" ")}
+                style={active ? { color: "var(--accent-color, #d75b88)" } : undefined}
+                strokeWidth={1.8}
+              />
+              {!collapsed && <span className="relative z-10 truncate text-[13px]">{label}</span>}
+              {key === "studio" && busy && (
+                <span
+                  className={collapsed ? "absolute top-1.5 right-1.5 size-1.5 rounded-full bg-amber-400 animate-pulse" : "relative z-10 ml-auto size-1.5 rounded-full bg-amber-400 animate-pulse"}
+                  title="Transcription processing"
+                />
+              )}
+              {key === "live" && liveActive && (
+                <span
+                  className={collapsed ? "absolute top-1.5 right-1.5 size-1.5 rounded-full bg-emerald-400 animate-pulse" : "relative z-10 ml-auto size-1.5 rounded-full bg-emerald-400 animate-pulse"}
+                  title="Live capture active"
+                />
+              )}
             </button>
           );
         })}
-      </nav>
-      </div>
-      <div className="shrink-0 border-t border-[var(--line)] px-4 py-5">
-        <div className={"flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.1em] text-[var(--green)] " + (collapsed ? "justify-center" : "")}>
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--green)]" />
-          {!collapsed && <span>Local engine</span>}
+
+        {/* Collapse / Expand Toggle Button */}
+        <div className="mt-2 border-t border-white/[0.06] pt-2">
+          <button
+            type="button"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={onToggle}
+            className={[
+              "group flex w-full items-center rounded-xl py-2.5 text-left text-xs text-zinc-500 transition-colors hover:bg-white/[0.035] hover:text-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b82f6]",
+              collapsed ? "justify-center px-2" : "gap-3 px-3",
+            ].join(" ")}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="size-4 text-zinc-600 group-hover:text-zinc-300" />
+            ) : (
+              <PanelLeftClose className="size-4 text-zinc-600 group-hover:text-zinc-300" />
+            )}
+            {!collapsed && <span className="truncate">Collapse sidebar</span>}
+          </button>
         </div>
-        {!collapsed && <div className="mt-2 text-[10px] leading-4 text-[var(--faint)]">Models, caches, and transcripts stay beside the program.</div>}
-      </div>
+      </nav>
+
+      {/* Local-first status footer */}
+      {!collapsed && (
+        <div className="mt-auto shrink-0 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-3">
+          <div className="flex items-center gap-2 text-xs text-zinc-300">
+            <Activity className="size-3.5 text-zinc-500" />
+            <span>Project-local workspace</span>
+          </div>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+            Media, temporary files, settings, and logs stay beside JanesCriber.
+          </p>
+        </div>
+      )}
     </motion.aside>
   );
 }

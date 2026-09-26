@@ -65,16 +65,14 @@ currently unsigned.
    to keep its data. A location such as `D:\Apps\JanesCriber` is fine.
 2. Keep every file and folder from the archive together. Do not run the EXE
    directly from inside the ZIP.
-3. Open `JanesCriber.exe`. Choose **Main UI** when the launcher offers the
-   interface choice. The legacy Python UI remains available as a fallback.
+3. Open `JanesCriber.exe` or `JanesCriberStudio.exe` to launch **JanesCriber Studio**.
 4. The first time you select a model, JanesCriber downloads that model into
    the local `.cache` folder. This requires internet access once; the actual
    transcription remains local.
 
-The portable release contains the packaged Python runtime, the legacy
-interface, JanesCriber Studio when it was included in the build, FFmpeg, and
-the dependency notices. It does not require a separate Python installation.
-The selected ASR model is downloaded on demand because bundling every model
+The portable release contains the packaged Python runtime, JanesCriber Studio,
+FFmpeg, and the dependency notices. It does not require a separate Python
+installation. The selected ASR model is downloaded on demand because bundling every model
 would make the download unnecessarily large.
 
 ### If you are running from the Git repository
@@ -301,18 +299,12 @@ The operating system, GPU drivers, browser downloads, and developer tools may
 still use C:. JanesCriber controls its own caches and temporary paths, not
 every cache created by Windows or third-party package managers.
 
-## Main UI and legacy UI
+## Desktop Studio and CLI
 
-JanesCriber ships with two interfaces:
+JanesCriber provides a modern native desktop interface along with direct command-line access:
 
-- **JanesCriber Studio** — the native Tauri/React interface with the Studio
-  layout, library, hardware monitor, settings, and compact live console.
-- **Legacy Python UI** — the original dependable console-oriented interface and
-  a useful fallback for diagnosing backend issues.
-
-When both are packaged, use **Settings** in Studio to choose which interface
-the launcher should use on the next launch, then relaunch. If Studio is not
-present in a source checkout, the launcher falls back to the legacy UI.
+- **JanesCriber Studio** — the native Tauri/React interface with JaneConverter-level polish, customizable theme colors, compact workspace layout, transcript library, real-time hardware telemetry, live capture, and console logs.
+- **CLI Mode** — direct terminal execution for script automation and headless environments without a graphical surface.
 
 ## Command line
 
@@ -337,7 +329,7 @@ prefer `uv run --no-sync` after setup.
 
 ## Building a release
 
-### Portable legacy/backend package
+### Portable package
 
 From a prepared Windows checkout:
 
@@ -345,9 +337,8 @@ From a prepared Windows checkout:
 .\build_release.ps1
 ```
 
-The script builds a PyInstaller directory, bundles FFmpeg, copies available
-dependency notices into `licenses`, includes Studio when its release EXE is
-present, creates a ZIP under `artifacts\releases`, and writes a SHA-256 file.
+The script builds the self-contained backend runtime, bundles FFmpeg, copies available
+dependency notices into `licenses`, includes JanesCriber Studio, creates a ZIP under `artifacts\releases`, and writes a SHA-256 file.
 The default package deliberately excludes the optional Qwen3-ASR package even
 when it happens to be installed in the developer environment. Include it only
 when you are making a larger specialist bundle:
@@ -471,9 +462,7 @@ controls.
 
 ### The program opens but Studio is unavailable
 
-The legacy launcher and Studio are separate deliverables. Run
-`build_desktop_ui.ps1` to create the Studio executable, or use the legacy UI
-until the Studio build is present beside the launcher.
+Run `npm.cmd run tauri:build -- --no-bundle` inside `desktop-ui` (or `build_desktop_ui.ps1`) to compile the Studio executable beside the project root.
 
 ## Verification
 

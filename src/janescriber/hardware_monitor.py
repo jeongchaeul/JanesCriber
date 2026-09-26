@@ -43,7 +43,7 @@ class NvidiaSmiProbe:
     """Use the installed NVIDIA driver utility without adding a GPU package."""
 
     def __init__(self) -> None:
-        self.executable = shutil.which("nvidia-smi") if sys.platform == "win32" else None
+        self.executable = shutil.which("nvidia-smi")
         self.available = bool(self.executable)
         self._creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 

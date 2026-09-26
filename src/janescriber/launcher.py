@@ -31,7 +31,7 @@ def read_frontend_preference(base_dir: str | Path | None = None) -> str:
     return value if value in VALID_FRONTENDS else FRONTEND_MAIN
 
 
-def write_frontend_preference(preference: str, base_dir: str | Path | None = None) -> Path:
+def write_frontend_preference(preference: str = FRONTEND_MAIN, base_dir: str | Path | None = None) -> Path:
     value = preference.strip().casefold()
     if value not in VALID_FRONTENDS:
         raise ValueError(f"Unsupported frontend preference: {preference}")
@@ -48,6 +48,11 @@ def find_main_ui(base_dir: str | Path | None = None) -> Path | None:
         root / "janescriber-studio.exe",
         root / "JanesCriber Studio.exe",
         root / "desktop-ui" / "src-tauri" / "target" / "release" / "janescriber-studio.exe",
+        root / "janescriber-studio",
+        root / "JanesCriberStudio",
+        root / "JanesCriber Studio",
+        root / "desktop-ui" / "src-tauri" / "target" / "release" / "janescriber-studio",
+        root / "JanesCriber Studio.app" / "Contents" / "MacOS" / "JanesCriber Studio",
     )
     for candidate in candidates:
         if candidate.is_file():
@@ -56,19 +61,22 @@ def find_main_ui(base_dir: str | Path | None = None) -> Path | None:
 
 
 def relaunch_command(base_dir: str | Path | None = None) -> list[str]:
+    main_ui = find_main_ui(base_dir)
+    if main_ui is not None:
+        return [str(main_ui)]
     root = _root(base_dir)
     universal_launcher = root / "JanesCriber.exe"
     if universal_launcher.is_file():
         return [str(universal_launcher)]
     if getattr(sys, "frozen", False):
         return [sys.executable]
-    return [sys.executable, "-m", "janescriber", "--gui"]
+    return [sys.executable, "-m", "janescriber"]
 
 
 def launch_main_ui(base_dir: str | Path | None = None) -> subprocess.Popen[bytes]:
     main_ui = find_main_ui(base_dir)
     if main_ui is None:
-        raise FileNotFoundError("JanesCriber Studio was not found beside the legacy launcher.")
+        raise FileNotFoundError("JanesCriber Studio was not found. Please build or run JanesCriberStudio.")
     root = _root(base_dir)
     environment = os.environ.copy()
     environment["JANESCRIBER_DATA_DIR"] = str(root)
@@ -77,6 +85,4 @@ def launch_main_ui(base_dir: str | Path | None = None) -> subprocess.Popen[bytes
         "env": environment,
         "close_fds": os.name != "nt",
     }
-    if os.name == "nt":
-        launch_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     return subprocess.Popen([str(main_ui)], **launch_kwargs)

@@ -1,0 +1,41 @@
+{
+  "schema": 2,
+  "ui": {
+    "windows": "JanesCriber.exe",
+    "linux": "JanesCriber",
+    "macos": "JanesCriber.app"
+  },
+  "private_runtime": "resources/runtime",
+  "documents": ["LICENSE", "README.md"],
+  "engine": {
+    "directory": "engine",
+    "windows": "JanesCriberEngine.exe",
+    "linux": "JanesCriberEngine",
+    "macos": "JanesCriberEngine",
+    "support_directory": "_internal",
+    "pyinstaller_mode": "onedir"
+  },
+  "tools": {
+    "directory": "bin",
+    "windows": ["ffmpeg.exe", "ffprobe.exe"],
+    "linux": ["ffmpeg", "ffprobe"],
+    "macos": ["ffmpeg", "ffprobe"]
+  },
+  "artifacts": [
+    "JanesCriber-<version>-windows-x64-setup.exe",
+    "JanesCriber-<version>-windows-x64-portable.zip",
+    "JanesCriber-<version>-linux-x86_64.tar.gz",
+    "JanesCriber-<version>-macos-arm64.dmg",
+    "JanesCriber-<version>-macos-x86_64.dmg"
+  ],
+  "forbidden": [
+    "gui.py",
+    "customtkinter",
+    "Program.cs",
+    "*.py",
+    "pip",
+    "npm",
+    "cargo",
+    "rustc"
+  ]
+}

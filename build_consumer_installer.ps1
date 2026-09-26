@@ -66,10 +66,8 @@ function Ensure-ConsumerRuntime {
     if (-not (Test-Path -LiteralPath $readyMarker)) {
         Write-Host "Installing the universal CPU runtime used by the consumer installer..." -ForegroundColor Cyan
         $packages = @(
-            "customtkinter>=5.2.2",
             "numpy>=1.26.0",
             "openai-whisper>=20240930",
-            "pillow>=10.0.0",
             "psutil>=5.9.0",
             "proc-tap>=1.1.1",
             "soundcard>=0.4.6",

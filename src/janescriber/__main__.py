@@ -11,8 +11,7 @@ from janescriber.pipeline import transcribe_media
 from janescriber.paths import project_dir, runtime_paths
 from janescriber.pipeline_config import SUPPORTED_ENGINES, SUPPORTED_OUTPUT_FORMATS, validate_transcription_request
 from janescriber.runtime import configure_runtime
-from janescriber.single_instance import acquire_gui_instance
-from janescriber.launcher import FRONTEND_MAIN, launch_main_ui, read_frontend_preference, find_main_ui
+from janescriber.launcher import find_main_ui, launch_main_ui
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -24,7 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--overwrite", action="store_true", help="Replace an existing transcript in the Transcripts folder")
     parser.add_argument("--no-cache", action="store_true", help="Run the selected engine again even when a cached transcript exists")
     parser.add_argument("--format", dest="output_format", default="txt", choices=SUPPORTED_OUTPUT_FORMATS, help="Transcript output format: TXT, SRT, VTT, or JSON")
-    parser.add_argument("--gui", action="store_true", help="Open the desktop console")
+    parser.add_argument("--gui", action="store_true", help="Open the JanesCriber Studio desktop UI")
     parser.add_argument("--service", action="store_true", help="Run the JSON-lines bridge used by JanesCriber Studio")
     return parser
 
@@ -36,15 +35,15 @@ def main(argv: list[str] | None = None) -> int:
         from janescriber.service import run_service
         return run_service()
     if args.gui or not args.media:
-        if read_frontend_preference() == FRONTEND_MAIN and find_main_ui() is not None:
+        main_ui = find_main_ui()
+        if main_ui is not None:
             launch_main_ui()
             return 0
-        if not acquire_gui_instance():
-            return 0
         configure_runtime(project_dir())
-        from janescriber.gui import JanesCriberApp
-        JanesCriberApp().mainloop()
-        return 0
+        print("JanesCriber Studio desktop interface not found.", file=sys.stderr)
+        print("Launch JanesCriberStudio or transcribe media directly via CLI:", file=sys.stderr)
+        print("  python -m janescriber <path/to/media.mp3>", file=sys.stderr)
+        return 1
     print("=" * 68)
     print("JANESCRIBER  |  LOCAL AI TRANSCRIPTION STUDIO")
     print(f"Input: {Path(args.media).resolve()}")

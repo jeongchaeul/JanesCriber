@@ -180,6 +180,8 @@ if ($useDirectML) {
 } elseif ($torchExtra -ne "cuda") {
     Write-Host "No NVIDIA CUDA runtime was selected. AMD/Intel/other DirectX 12 users can opt into the compatibility path with: setup.bat directml" -ForegroundColor Gray
 }
-if (Test-Path -LiteralPath "$scriptDir\JanesCriber.exe") {
+if (Test-Path -LiteralPath "$scriptDir\JanesCriberStudio.exe") {
+    Start-Process -FilePath "$scriptDir\JanesCriberStudio.exe" -WorkingDirectory $scriptDir
+} elseif (Test-Path -LiteralPath "$scriptDir\JanesCriber.exe") {
     Start-Process -FilePath "$scriptDir\JanesCriber.exe" -WorkingDirectory $scriptDir
 }

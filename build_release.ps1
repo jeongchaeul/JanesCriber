@@ -89,9 +89,9 @@ foreach ($file in $ffmpegFiles) { Copy-Item -LiteralPath $file.FullName -Destina
 $studioExecutable = Join-Path $scriptDir "desktop-ui\src-tauri\target\release\janescriber-studio.exe"
 if (Test-Path -LiteralPath $studioExecutable) {
     Copy-Item -LiteralPath $studioExecutable -Destination (Join-Path $portableApp "JanesCriberStudio.exe") -Force
-    Write-Host "Included JanesCriber Studio beside the legacy Python launcher." -ForegroundColor Green
+    Write-Host "Included JanesCriber Studio in the portable package." -ForegroundColor Green
 } else {
-    Write-Warning "JanesCriber Studio was not found. The portable package will contain the legacy Python interface only."
+    Write-Warning "JanesCriber Studio was not found. The portable package will contain the CLI / service backend only."
 }
 Copy-Item -Path (Join-Path $portableApp "*") -Destination $staging -Recurse -Force
 foreach ($file in @("README.md", "ARCHITECTURE.md")) {

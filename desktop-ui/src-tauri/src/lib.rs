@@ -108,92 +108,65 @@ fn preference_candidates(app: Option<&tauri::AppHandle>) -> Vec<PathBuf> {
 
 fn candidate_backend(app: &tauri::AppHandle) -> (PathBuf, Vec<String>, PathBuf) {
     let source = source_root();
-    let mut roots = Vec::new();
-    roots.push(resource_root(app));
+    let mut check_dirs = vec![source.clone(), resource_root(app)];
     if let Ok(executable) = std::env::current_exe() {
         if let Some(parent) = executable.parent() {
-            roots.push(parent.to_path_buf());
+            check_dirs.push(parent.to_path_buf());
         }
     }
-    roots.push(source.clone());
+    check_dirs.dedup();
 
-    for root in &roots {
-        let mut relatives = vec![
-            "backend/JanesCriberBackend.exe",
-            "JanesCriberBackend.exe",
-            "backend/JanesCriber.exe",
-            "JanesCriber/JanesCriber.exe",
+    // 1. Look for virtualenv Python in known locations
+    for dir in &check_dirs {
+        let venv_candidates = [
+            dir.join(".venv").join("Scripts").join("python.exe"),
+            dir.join(".venv").join("bin").join("python"),
+            dir.join("venv").join("Scripts").join("python.exe"),
+            dir.join("venv").join("bin").join("python"),
         ];
-        // The source checkout's root JanesCriber.exe is the legacy C# launcher,
-        // not the backend. Only accept a root-level executable from packaged
-        // layouts where it is the PyInstaller service runtime.
-        if root != &source {
-            relatives.push("JanesCriber.exe");
-        }
-        for relative in relatives {
-            let path = root.join(relative);
-            if path.is_file() {
-                return (path, vec!["--service".into()], root.clone());
+        for candidate in venv_candidates {
+            if candidate.is_file() {
+                return (
+                    candidate,
+                    vec!["-u".into(), "-m".into(), "janescriber".into(), "--service".into()],
+                    dir.clone(),
+                );
             }
         }
     }
 
-    let python = source.join(".venv").join("Scripts").join("python.exe");
-    if python.is_file() {
-        return (
-            python,
-            vec!["-u".into(), "-m".into(), "janescriber".into(), "--service".into()],
-            source.clone(),
-        );
+    // 2. Look for packaged backend binaries (in subdirectories or specific names, avoiding self)
+    for dir in &check_dirs {
+        let relatives = [
+            "resources/runtime/engine/JanesCriberEngine.exe",
+            "resources/runtime/engine/JanesCriberEngine",
+            "runtime/engine/JanesCriberEngine.exe",
+            "runtime/engine/JanesCriberEngine",
+            "engine/JanesCriberEngine.exe",
+            "engine/JanesCriberEngine",
+            "JanesCriberEngine.exe",
+            "JanesCriberEngine",
+            "backend/JanesCriberBackend.exe",
+            "backend/JanesCriberBackend",
+            "JanesCriberBackend.exe",
+            "JanesCriberBackend",
+            "backend/JanesCriber.exe",
+            "backend/JanesCriber",
+            "JanesCriber/JanesCriber.exe",
+            "JanesCriber/JanesCriber",
+        ];
+        for relative in relatives {
+            let path = dir.join(relative);
+            if path.is_file() {
+                return (path, vec!["--service".into()], dir.clone());
+            }
+        }
     }
+
+    // 3. Fallback to system Python
     (
         PathBuf::from("python"),
         vec!["-u".into(), "-m".into(), "janescriber".into(), "--service".into()],
-        source,
-    )
-}
-
-fn candidate_legacy_gui(app: &tauri::AppHandle) -> (PathBuf, Vec<String>, PathBuf) {
-    let source = source_root();
-    let mut roots = vec![resource_root(app)];
-    if let Ok(executable) = std::env::current_exe() {
-        if let Some(parent) = executable.parent() {
-            roots.push(parent.to_path_buf());
-        }
-    }
-    roots.push(source.clone());
-    roots.dedup();
-
-    for root in &roots {
-        let relatives = if root == &source {
-            vec!["JanesCriberBackend.exe", "backend/JanesCriberBackend.exe"]
-        } else {
-            vec![
-                "backend/JanesCriber.exe",
-                "JanesCriberBackend.exe",
-                "JanesCriber/JanesCriber.exe",
-                "JanesCriber.exe",
-            ]
-        };
-        for relative in relatives {
-            let path = root.join(relative);
-            if path.is_file() {
-                return (path, vec!["--gui".into()], root.clone());
-            }
-        }
-    }
-
-    let python = source.join(".venv").join("Scripts").join("python.exe");
-    if python.is_file() {
-        return (
-            python,
-            vec!["-u".into(), "-m".into(), "janescriber".into(), "--gui".into()],
-            source,
-        );
-    }
-    (
-        PathBuf::from("python"),
-        vec!["-u".into(), "-m".into(), "janescriber".into(), "--gui".into()],
         source,
     )
 }
@@ -236,9 +209,34 @@ fn ensure_backend(app: &tauri::AppHandle, state: &BackendState) -> Result<Backen
         .map_err(|error| format!("Could not prepare JanesCriber data directory: {error}"))?;
     let mut command = Command::new(&program);
     configure_background_command(&mut command);
+
+    let mut env_path = std::env::var("PATH").unwrap_or_default();
+    let bin_candidates = [
+        resource_directory.join("resources").join("runtime").join("bin"),
+        resource_directory.join("runtime").join("bin"),
+        resource_directory.join("bin"),
+        working_directory.join("resources").join("runtime").join("bin"),
+        working_directory.join("runtime").join("bin"),
+        working_directory.join("bin"),
+        working_directory.join("ffmpeg"),
+    ];
+    for bin_dir in bin_candidates {
+        if bin_dir.is_dir() {
+            #[cfg(target_os = "windows")]
+            {
+                env_path = format!("{};{}", bin_dir.display(), env_path);
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                env_path = format!("{}:{}", bin_dir.display(), env_path);
+            }
+        }
+    }
+
     command
         .args(args)
         .current_dir(&working_directory)
+        .env("PATH", env_path)
         .env("PYTHONUNBUFFERED", "1")
         .env("PYTHONPATH", working_directory.join("src"))
         .env("JANESCRIBER_DATA_DIR", &data_directory)
@@ -327,10 +325,8 @@ fn backend_stop(state: State<'_, BackendState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn set_frontend_preference(app: tauri::AppHandle, preference: String) -> Result<(), String> {
-    if preference != "tauri" && preference != "python" {
-        return Err("Unsupported interface preference.".to_owned());
-    }
+fn set_frontend_preference(app: tauri::AppHandle, _preference: String) -> Result<(), String> {
+    let preference = "tauri";
     let mut last_error = None;
     for candidate in preference_candidates(Some(&app)) {
         if let Some(parent) = candidate.parent() {
@@ -411,29 +407,16 @@ fn open_release_page() -> Result<(), String> {
 fn relaunch_launcher(app: tauri::AppHandle, state: State<'_, BackendState>) -> Result<(), String> {
     let data_directory = data_root(&app);
     let resource_directory = resource_root(&app);
-    let preference = preference_candidates(Some(&app))
-        .into_iter()
-        .find_map(|candidate| fs::read_to_string(candidate).ok())
-        .map(|value| value.trim().to_owned())
-        .filter(|value| value == "python" || value == "tauri")
-        .unwrap_or_else(|| "tauri".to_owned());
     backend_stop(state)?;
-    let (program, args, working_directory) = if preference == "python" {
-        candidate_legacy_gui(&app)
-    } else {
-        let current = std::env::current_exe().map_err(|error| format!("Could not locate JanesCriber Studio: {error}"))?;
-        let working_directory = current.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
-        (current, Vec::new(), working_directory)
-    };
-    let mut command = Command::new(&program);
-    configure_background_command(&mut command);
+    let current = std::env::current_exe().map_err(|error| format!("Could not locate JanesCriber Studio: {error}"))?;
+    let working_directory = current.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
+    let mut command = Command::new(&current);
     command
         .current_dir(working_directory)
         .env("JANESCRIBER_DATA_DIR", &data_directory)
         .env("JANESCRIBER_RESOURCE_DIR", &resource_directory)
-        .args(args)
         .spawn()
-        .map_err(|error| format!("Could not relaunch JanesCriber through {}: {error}", program.display()))?;
+        .map_err(|error| format!("Could not relaunch JanesCriber Studio through {}: {error}", current.display()))?;
     app.exit(0);
     Ok(())
 }
@@ -451,11 +434,18 @@ fn open_path(path: String) -> Result<(), String> {
         command.arg(candidate).spawn().map_err(|error| format!("Could not open the folder: {error}"))?;
         return Ok(());
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open").arg(candidate).spawn().map_err(|error| format!("Could not open the folder: {error}"))?;
+        return Ok(());
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
     {
         Command::new("xdg-open").arg(candidate).spawn().map_err(|error| format!("Could not open the folder: {error}"))?;
-        Ok(())
+        return Ok(());
     }
+    #[allow(unreachable_code)]
+    Err("Opening the folder is not supported on this platform.".to_owned())
 }
 
 pub fn run() {

@@ -20,10 +20,10 @@ table is the release gate for the two launchers.
 | Live model and language settings | Same supported live engines, model warnings, and language picker |
 | Hardware and pipeline monitor | Friendly hardware names, CPU/RAM/GPU/VRAM telemetry, and tracker |
 | Project-local cache and scratch paths | Same D-drive-friendly runtime paths, exposed in Hardware & Pipeline |
-| Legacy Python Tk launcher | Preserved as the fallback launcher and backend source of truth |
+| Native desktop experience | Tauri v2 desktop surface with real-time theme customization and JaneConverter parity (superseding the legacy Tkinter prototype) |
 | Cancel isolated work | Rust supervises the bridge; Python transcription and live workers remain isolated |
 
 The native shell deliberately does not reimplement ASR. That keeps model
 behavior, cancellation, output formatting, and future engine improvements
-consistent between both launchers.
+rock-solid in the shared Python engine.
 

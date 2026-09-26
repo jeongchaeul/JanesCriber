@@ -11,6 +11,32 @@ namespace JanesCriberLauncher
         static void Main()
         {
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string studioExe = Path.Combine(baseDir, "JanesCriberStudio.exe");
+            if (File.Exists(studioExe))
+            {
+                try
+                {
+                    ProcessStartInfo psiStudio = new ProcessStartInfo
+                    {
+                        FileName = studioExe,
+                        WorkingDirectory = baseDir,
+                        UseShellExecute = true
+                    };
+                    Process.Start(psiStudio);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        "JanesCriber Studio could not start:\n\n" + ex.Message,
+                        "JanesCriber - Launch Error",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error
+                    );
+                    return;
+                }
+            }
+
             string[] candidates = new string[]
             {
                 Path.Combine(baseDir, ".venv", "Scripts", "pythonw.exe"),
