@@ -2,14 +2,21 @@
 
 All notable JanesCriber changes are documented here.
 
-## [Unreleased]
+## [2.0.0] - 2026-09-27
 
 ### Added
 
-- Studio release checking against the official GitHub Releases page, with a
-  manual update action that preserves local application data.
-- A universal consumer installer path alongside the hardware-tuned developer
-  setup path.
+- Native Tauri Studio interface promoted to primary, exclusive desktop interface.
+- Zero-terminal, zero-prerequisite standalone consumer installer and portable package matching JaneConverter standards.
+- Bundled internal Python engine runtime (`JanesCriberEngine`) with PyTorch, Whisper, and Vosk pre-packaged.
+- Bundled static FFmpeg and ffprobe binaries.
+- Multi-OS packaging support: native Linux tarball pipeline and macOS arm64/x86_64 DMG pipelines.
+- Live hardware telemetry panel with dynamic CPU, memory, and engine health monitoring.
+- Studio release checking against the official GitHub Releases page with manual update action.
+
+### Removed
+
+- Deprecated legacy CustomTkinter Python GUI (`gui.py`, `file_drop.py`, `gui_common.py`) and transitional headers.
 
 ## [1.0.0] - 2026-09-20
 

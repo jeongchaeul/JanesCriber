@@ -2,7 +2,7 @@
   <img src="assets/icon.png" alt="JanesCriber logo" width="128">
   <h1>JanesCriber</h1>
   <p><strong>Private, local-first audio and video transcription</strong></p>
-  <p>Janes Media Suite · v1.0.0 · Windows desktop release</p>
+  <p>Janes Media Suite · v2.0.0 · Desktop release</p>
 </div>
 
 <br>
@@ -16,10 +16,10 @@ This is the transcription member of the Jane Media Suite. It is intended for
 meetings, calls, interviews, lectures, videos, accessibility documentation,
 and any other situation where searchable local notes matter.
 
-> **v1.0.0 status:** This is the first public release of the local
-> transcription workflow. Hardware drivers, model downloads, audio devices,
-> and Windows permissions vary between machines, so the troubleshooting and
-> compatibility notes below are part of the product—not optional fine print.
+> **v2.0.0 status:** Version 2.0.0 consolidates exclusively on the modern Tauri
+> desktop interface, integrates self-contained packaging matching JaneConverter,
+> bundles all required runtimes and tools, and adds cross-platform packaging
+> support for Linux and macOS.
 
 ## Start here
 
@@ -368,9 +368,8 @@ Apple, or no usable accelerator:
 The output is written to `artifacts\releases` as:
 
 ```text
-JanesCriber-1.0.0-Setup.exe
-JanesCriber-1.0.0-Setup.exe.sha256
-JanesCriber-1.0.0-Setup.exe.json
+JanesCriber-2.0.0-windows-x64-setup.exe
+JanesCriber-2.0.0-windows-x64-portable.zip
 ```
 
 The packaging script validates that the installer, manifest version, bundled
@@ -487,7 +486,7 @@ production dependency audit, and Tauri/Rust source compilation.
 ## Project documentation
 
 - [Architecture](ARCHITECTURE.md) — backend boundaries and pipeline structure.
-- [Release notes](CHANGELOG.md) — user-facing v1.0.0 changes.
+- [Release notes](CHANGELOG.md) — user-facing v2.0.0 changes.
 - [Release plan](RELEASE_PLAN.md) — follow-up hardening and distribution work.
 - [Desktop UI parity](docs/desktop-ui-parity.md) — legacy and Studio feature
   coverage.

@@ -1,6 +1,6 @@
 [package]
 name = "janescriber-studio"
-version = "1.0.0"
+version = "2.0.0"
 description = "The modern JanesCriber desktop surface"
 authors = ["project//aspyr"]
 edition = "2021"

@@ -43,5 +43,5 @@ def test_validate_project_versions_rejects_drift(tmp_path: Path):
 
 def test_repository_versions_are_consistent():
     root = Path(__file__).resolve().parents[1]
-    versions = validate_project_versions(root, expected="1.0.0")
-    assert set(versions.values()) == {"1.0.0"}
+    versions = validate_project_versions(root, expected="2.0.0")
+    assert set(versions.values()) == {"2.0.0"}
