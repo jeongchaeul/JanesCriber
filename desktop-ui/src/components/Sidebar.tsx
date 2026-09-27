@@ -123,20 +123,20 @@ export function Sidebar({
             {!collapsed && <span className="truncate">Collapse sidebar</span>}
           </button>
         </div>
-      </nav>
 
-      {/* Local-first status footer */}
-      {!collapsed && (
-        <div className="mt-auto shrink-0 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-3">
-          <div className="flex items-center gap-2 text-xs text-zinc-300">
-            <Activity className="size-3.5 text-zinc-500" />
-            <span>Project-local workspace</span>
+        {/* Local-first status indicator placed directly below collapse button (JaneConverter Parity) */}
+        {!collapsed && (
+          <div className="mt-3 shrink-0 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-3">
+            <div className="flex items-center gap-2 text-xs text-zinc-300">
+              <Activity className="size-3.5 text-zinc-500" />
+              <span>Project-local workspace</span>
+            </div>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+              Media, temporary files, settings, and logs stay beside JanesCriber.
+            </p>
           </div>
-          <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-            Media, temporary files, settings, and logs stay beside JanesCriber.
-          </p>
-        </div>
-      )}
+        )}
+      </nav>
     </motion.aside>
   );
 }

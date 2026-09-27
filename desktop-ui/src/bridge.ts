@@ -84,3 +84,32 @@ export async function getAppVersion(): Promise<string> {
 export async function openReleasePage(): Promise<void> {
   await invoke("open_release_page");
 }
+
+export type DragDropPayload = {
+  type: "enter" | "over" | "drop" | "leave";
+  paths?: string[];
+};
+
+export async function onFileDragDrop(
+  callback: (event: DragDropPayload) => void
+): Promise<UnlistenFn> {
+  try {
+    const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+    const webview = getCurrentWebview();
+    return await webview.onDragDropEvent((event) => {
+      const payload = event.payload;
+      if (payload.type === "drop") {
+        callback({ type: "drop", paths: payload.paths });
+      } else if (payload.type === "enter") {
+        callback({ type: "enter", paths: payload.paths });
+      } else if (payload.type === "over") {
+        callback({ type: "over" });
+      } else if (payload.type === "leave") {
+        callback({ type: "leave" });
+      }
+    });
+  } catch (error) {
+    // In headless testing or environments without Tauri runtime
+    return () => {};
+  }
+}
