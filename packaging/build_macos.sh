@@ -131,6 +131,7 @@ uv run --locked pyinstaller --noconfirm --clean --onedir --contents-directory _i
   --paths "$REPO_ROOT/src" \
   --hidden-import vosk \
   --collect-all vosk \
+  --collect-all whisper \
   --hidden-import transformers \
   --collect-submodules transformers.models.wav2vec2 \
   --distpath "$PYINSTALLER_ROOT/dist" \

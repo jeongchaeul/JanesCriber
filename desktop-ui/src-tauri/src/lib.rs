@@ -56,6 +56,17 @@ fn resource_root(app: &tauri::AppHandle) -> PathBuf {
     source_root()
 }
 
+pub fn clean_windows_path(value: &str) -> String {
+    let trimmed = value.trim();
+    if let Some(unc) = trimmed.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{unc}")
+    } else if let Some(plain) = trimmed.strip_prefix(r"\\?\") {
+        plain.to_owned()
+    } else {
+        trimmed.to_owned()
+    }
+}
+
 fn data_location_path(app: &tauri::AppHandle) -> PathBuf {
     app.path()
         .app_config_dir()
@@ -65,13 +76,13 @@ fn data_location_path(app: &tauri::AppHandle) -> PathBuf {
 
 fn data_root(app: &tauri::AppHandle) -> PathBuf {
     if let Ok(data_dir) = std::env::var("JANESCRIBER_DATA_DIR") {
-        let data_dir = data_dir.trim();
+        let data_dir = clean_windows_path(&data_dir);
         if !data_dir.is_empty() {
             return PathBuf::from(data_dir);
         }
     }
     if let Ok(saved) = fs::read_to_string(data_location_path(app)) {
-        let saved = saved.trim();
+        let saved = clean_windows_path(saved.trim());
         if !saved.is_empty() {
             return PathBuf::from(saved);
         }
@@ -365,14 +376,15 @@ fn set_data_directory(app: tauri::AppHandle, directory: String) -> Result<String
     }
     let resolved = fs::canonicalize(&candidate)
         .map_err(|error| format!("Could not resolve the selected data folder: {error}"))?;
+    let cleaned = clean_windows_path(&resolved.display().to_string());
     let location = data_location_path(&app);
     if let Some(parent) = location.parent() {
         fs::create_dir_all(parent)
             .map_err(|error| format!("Could not prepare the settings folder: {error}"))?;
     }
-    fs::write(&location, format!("{}\n", resolved.display()))
+    fs::write(&location, format!("{}\n", cleaned))
         .map_err(|error| format!("Could not save the data folder setting: {error}"))?;
-    Ok(resolved.to_string_lossy().into_owned())
+    Ok(cleaned)
 }
 
 #[tauri::command]
@@ -461,4 +473,33 @@ pub fn run() {
                 let _ = backend_stop(state);
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_clean_windows_path_verbatim() {
+        assert_eq!(
+            clean_windows_path(r"\\?\I:\Files 1\JanesCriber Library"),
+            r"I:\Files 1\JanesCriber Library"
+        );
+    }
+
+    #[test]
+    fn test_clean_windows_path_unc() {
+        assert_eq!(
+            clean_windows_path(r"\\?\UNC\server\share\folder"),
+            r"\\server\share\folder"
+        );
+    }
+
+    #[test]
+    fn test_clean_windows_path_normal() {
+        assert_eq!(
+            clean_windows_path(r"D:\Documents\JanesCriber"),
+            r"D:\Documents\JanesCriber"
+        );
+    }
 }

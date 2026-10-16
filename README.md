@@ -4,7 +4,7 @@
   <p><strong>Fast, private, 100% offline audio & video transcription on your own machine.</strong></p>
   <p>Zero cloud APIs · Zero data leaks · Zero terminal needed · Janes Media Suite</p>
   <p>
-    <a href="https://github.com/jeongchaeul/JanesCriber/releases/latest"><img src="https://img.shields.io/badge/version-2.0.0-blue.svg" alt="Version 2.0.0"></a>
+    <a href="https://github.com/janecerys/JanesCriber/releases/latest"><img src="https://img.shields.io/badge/version-2.1.0-blue.svg" alt="Version 2.1.0"></a>
     <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg" alt="Platforms">
     <img src="https://img.shields.io/badge/engine-Whisper%20%7C%20Vosk%20%7C%20Wav2Vec2-orange.svg" alt="Engines">
     <img src="https://img.shields.io/badge/privacy-100%25%20Local-success.svg" alt="100% Local">
@@ -20,9 +20,12 @@
 ## ⚡ Quick Start (Zero Terminal, Zero Prerequisites)
 
 ### 1. Download & Install
-1. Open the **[Releases](https://github.com/jeongchaeul/JanesCriber/releases/latest)** page.
-2. Download **`JanesCriber-2.0.0-windows-x64-setup.exe`** (or download the portable `.zip` if you prefer a no-install folder).
-3. Run the installer and launch **JanesCriber Studio**. *(Python, FFmpeg, and PyTorch runtimes are already bundled internally — no extra downloads needed).*
+1. Open the **[Releases](https://github.com/janecerys/JanesCriber/releases/latest)** page.
+2. Select your platform package:
+   - **Windows (x64)**: Download **`JanesCriber-2.1.0-windows-x64-setup.exe`** (or portable `JanesCriber-2.1.0-windows-x64-portable.zip`).
+   - **macOS**: Download **`JanesCriber-2.1.0-macos-arm64.dmg`** (Apple Silicon M1/M2/M3/M4) or **`JanesCriber-2.1.0-macos-x86_64.dmg`** (Intel).
+   - **Linux (x86_64)**: Download **`JanesCriber-2.1.0-linux-x86_64.tar.gz`**.
+3. Launch **JanesCriber Studio**. *(Python, FFmpeg, and PyTorch runtimes are already bundled internally — no extra downloads needed).*
 
 ### 2. Drag, Drop & Transcribe
 1. **Drag and drop** any audio or video file directly into JanesCriber.

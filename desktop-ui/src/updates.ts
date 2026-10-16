@@ -32,8 +32,14 @@ function hasInstallerAsset(value: unknown): boolean {
   if (!Array.isArray(value)) return false;
   return value.some((asset) => {
     const item = objectValue(asset);
-    const name = textValue(item?.name);
-    return Boolean(name?.toLowerCase().endsWith("-setup.exe"));
+    const name = textValue(item?.name)?.toLowerCase();
+    return Boolean(
+      name && (
+        name.endsWith("-setup.exe") ||
+        name.endsWith(".dmg") ||
+        (name.endsWith(".tar.gz") && (name.includes("linux") || name.includes("macos")))
+      )
+    );
   });
 }
 

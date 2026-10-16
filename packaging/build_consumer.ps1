@@ -99,6 +99,7 @@ Invoke-Checked {
         --hidden-import proctap.backends.windows `
         --hidden-import vosk `
         --collect-all vosk `
+        --collect-all whisper `
         --hidden-import transformers `
         --collect-submodules transformers.models.wav2vec2 `
         --distpath $engineDist `
@@ -119,7 +120,14 @@ if (Test-Path -LiteralPath (Join-Path $repoRoot "LICENSE")) {
 }
 Copy-Item -LiteralPath (Join-Path $repoRoot "README.md") -Destination (Join-Path $payloadRoot "README.md")
 
-Invoke-Checked { & (Join-Path $runtimeEngine "JanesCriberEngine.exe") --help | Out-Null } "Frozen engine smoke test"
+$engineSmokeArguments = @(
+    "--engine", (Join-Path $runtimeEngine "JanesCriberEngine.exe"),
+    "--runtime-bin", $runtimeBin,
+    "--work-directory", (Join-Path $pyinstallerRoot "smoke")
+)
+Invoke-Checked {
+    & $uv run --locked python (Join-Path $repoRoot "packaging\smoke_test_engine.py") @engineSmokeArguments
+} "Packaged engine conversion and asset smoke test"
 
 $forbiddenRuntimeNames = @("gui.py", "customtkinter", "Program.cs", "pip.exe", "npm.exe", "cargo.exe", "rustc.exe")
 foreach ($name in $forbiddenRuntimeNames) {

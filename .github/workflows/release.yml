@@ -1,0 +1,296 @@
+name: Release packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      existing_release_tag:
+        description: Existing v<version> release whose packages should be rebuilt and replaced
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+
+  windows-x64:
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          architecture: x64
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          architecture: x64
+          cache: npm
+          cache-dependency-path: desktop-ui/package-lock.json
+      - name: Set up Rust
+        shell: pwsh
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Install Python build dependencies
+        run: uv sync --locked --dev
+      - name: Validate version consistency
+        run: uv run python -m janescriber.versioning --root .
+      - name: Download and verify static FFmpeg
+        id: ffmpeg
+        shell: pwsh
+        run: |
+          $tag = "autobuild-2026-09-30-13-08"
+          $name = "ffmpeg-N-127021-ge0c94b2d1c-win64-gpl.zip"
+          $expected = "85c4a4636b93d681a07588ffa6f1d8f5c064d9c3fb0622066662906b6fd718a1"
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/$tag/$name"
+          Invoke-WebRequest -Uri $url -OutFile $name
+          $actual = (Get-FileHash -Algorithm SHA256 $name).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "FFmpeg SHA256 verification failed." }
+          Expand-Archive -LiteralPath $name -DestinationPath ffmpeg-static
+          $ffmpeg = (Get-ChildItem ffmpeg-static -Recurse -Filter ffmpeg.exe -File | Select-Object -First 1).FullName
+          $ffprobe = (Get-ChildItem ffmpeg-static -Recurse -Filter ffprobe.exe -File | Select-Object -First 1).FullName
+          if (-not $ffmpeg -or -not $ffprobe) { throw "Verified FFmpeg archive did not contain both tools." }
+          "ffmpeg=$ffmpeg" >> $env:GITHUB_OUTPUT
+          "ffprobe=$ffprobe" >> $env:GITHUB_OUTPUT
+      - name: Verify tag version
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.existing_release_tag != '')
+        env:
+          PUBLISH_TAG: ${{ inputs.existing_release_tag || github.ref_name }}
+        shell: pwsh
+        run: |
+          $version = & uv run python -c "from janescriber import __version__; print(__version__)"
+          if ($env:PUBLISH_TAG -ne "v$version") { throw "Release tag $env:PUBLISH_TAG does not match engine version $version." }
+      - name: Build Windows installer and portable package
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File packaging/build_consumer.ps1 `
+            -FFmpegPath "${{ steps.ffmpeg.outputs.ffmpeg }}" `
+            -FFprobePath "${{ steps.ffmpeg.outputs.ffprobe }}"
+      - name: Upload Windows release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-release
+          if-no-files-found: error
+          path: |
+            dist/JanesCriber-*-windows-x64-setup.exe
+            dist/JanesCriber-*-windows-x64-setup.exe.sha256
+            dist/JanesCriber-*-windows-x64-portable.zip
+            dist/JanesCriber-*-windows-x64-portable.zip.sha256
+
+  linux-x86_64:
+    needs: validate
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop-ui/package-lock.json
+      - name: Install Tauri Linux prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential curl file libayatana-appindicator3-dev libfuse2 libssl-dev \
+            libwebkit2gtk-4.1-dev libxdo-dev librsvg2-dev patchelf wget xz-utils
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Install Python build dependencies
+        run: uv sync --locked --dev
+      - name: Validate version consistency
+        run: uv run python -m janescriber.versioning --root .
+      - name: Download and verify static FFmpeg
+        id: ffmpeg
+        run: |
+          set -euo pipefail
+          tag=autobuild-2026-09-30-13-08
+          name=ffmpeg-N-127021-ge0c94b2d1c-linux64-gpl.tar.xz
+          expected=3a2a94e704752287833604501a79505c2319ad1d8b2f5577c63f2b1b7a6f2b66
+          url="https://github.com/BtbN/FFmpeg-Builds/releases/download/$tag/$name"
+          curl --fail --location --retry 3 --output "$name" "$url"
+          actual="$(sha256sum "$name" | cut -d' ' -f1)"
+          test "$actual" = "$expected"
+          mkdir ffmpeg-static
+          tar -xJf "$name" -C ffmpeg-static
+          ffmpeg="$(find "$PWD/ffmpeg-static" -type f -name ffmpeg -perm -111 -print -quit)"
+          ffprobe="$(find "$PWD/ffmpeg-static" -type f -name ffprobe -perm -111 -print -quit)"
+          test -n "$ffmpeg" && test -n "$ffprobe"
+          echo "ffmpeg=$ffmpeg" >> "$GITHUB_OUTPUT"
+          echo "ffprobe=$ffprobe" >> "$GITHUB_OUTPUT"
+      - name: Verify tag version
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.existing_release_tag != '')
+        env:
+          PUBLISH_TAG: ${{ inputs.existing_release_tag || github.ref_name }}
+        run: |
+          version="$(uv run python -c 'from janescriber import __version__; print(__version__)')"
+          test "$PUBLISH_TAG" = "v$version"
+      - name: Build Linux portable package
+        run: |
+          bash packaging/build_linux.sh \
+            --ffmpeg "${{ steps.ffmpeg.outputs.ffmpeg }}" \
+            --ffprobe "${{ steps.ffmpeg.outputs.ffprobe }}"
+      - name: Upload Linux release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64-release
+          if-no-files-found: error
+          path: |
+            dist/JanesCriber-*-linux-x86_64.tar.gz
+            dist/JanesCriber-*-linux-x86_64.tar.gz.sha256
+
+  macos:
+    needs: validate
+    name: macos-${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-latest
+            python-architecture: arm64
+            node-architecture: arm64
+            ffmpeg-asset: ffmpeg-darwin-arm64
+            ffmpeg-url: https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-arm64
+            ffmpeg-sha256: a90e3db6a3fd35f6074b013f948b1aa45b31c6375489d39e572bea3f18336584
+            ffprobe-asset: ffprobe-darwin-arm64
+            ffprobe-url: https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffprobe-darwin-arm64
+            ffprobe-sha256: bb2db6f5d8cef919da12fbf592119a987202a8c060a886f3cab091f9cab90b64
+          - arch: x86_64
+            runner: macos-15-intel
+            python-architecture: x64
+            node-architecture: x64
+            ffmpeg-asset: ffmpeg-darwin-x64
+            ffmpeg-url: https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-x64
+            ffmpeg-sha256: ebdddc936f61e14049a2d4b549a412b8a40deeff6540e58a9f2a2da9e6b18894
+            ffprobe-asset: ffprobe-darwin-x64
+            ffprobe-url: https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffprobe-darwin-x64
+            ffprobe-sha256: fa3add0ce901f7241abe0dfc0155d958fc834aca3f8ce61f87cc712ae669c1e0
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          architecture: ${{ matrix.python-architecture }}
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          architecture: ${{ matrix.node-architecture }}
+          cache: npm
+          cache-dependency-path: desktop-ui/package-lock.json
+      - name: Verify native runner architecture
+        run: test "$(uname -m)" = "${{ matrix.arch }}"
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Install Python build dependencies
+        run: uv sync --locked --dev
+      - name: Validate version consistency
+        run: uv run python -m janescriber.versioning --root .
+      - name: Download and verify FFmpeg tools
+        id: ffmpeg
+        run: |
+          set -euo pipefail
+          mkdir ffmpeg-static
+          ffmpeg="ffmpeg-static/${{ matrix.ffmpeg-asset }}"
+          ffprobe="ffmpeg-static/${{ matrix.ffprobe-asset }}"
+          curl --fail --location --retry 3 \
+            --output "$ffmpeg" \
+            "${{ matrix.ffmpeg-url }}"
+          curl --fail --location --retry 3 \
+            --output "$ffprobe" \
+            "${{ matrix.ffprobe-url }}"
+          printf '%s  %s\n' '${{ matrix.ffmpeg-sha256 }}' "$ffmpeg" | shasum -a 256 -c -
+          printf '%s  %s\n' '${{ matrix.ffprobe-sha256 }}' "$ffprobe" | shasum -a 256 -c -
+          chmod 0755 "$ffmpeg" "$ffprobe"
+          echo "ffmpeg=$PWD/$ffmpeg" >> "$GITHUB_OUTPUT"
+          echo "ffprobe=$PWD/$ffprobe" >> "$GITHUB_OUTPUT"
+      - name: Verify tag version
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.existing_release_tag != '')
+        env:
+          PUBLISH_TAG: ${{ inputs.existing_release_tag || github.ref_name }}
+        run: |
+          version="$(uv run python -c 'from janescriber import __version__; print(__version__)')"
+          test "$PUBLISH_TAG" = "v$version"
+      - name: Build macOS DMG and portable app
+        run: |
+          bash packaging/build_macos.sh \
+            --ffmpeg "${{ steps.ffmpeg.outputs.ffmpeg }}" \
+            --ffprobe "${{ steps.ffmpeg.outputs.ffprobe }}"
+      - name: Upload macOS release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}-release
+          if-no-files-found: error
+          path: |
+            dist/JanesCriber-*-macos-${{ matrix.arch }}.dmg
+            dist/JanesCriber-*-macos-${{ matrix.arch }}.dmg.sha256
+            dist/JanesCriber-*-macos-${{ matrix.arch }}.tar.gz
+            dist/JanesCriber-*-macos-${{ matrix.arch }}.tar.gz.sha256
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.existing_release_tag != '')
+    needs: [validate, windows-x64, linux-x86_64, macos]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.existing_release_tag || github.ref_name }}
+        run: |
+          if [ -z "$RELEASE_TAG" ] || [ "$RELEASE_TAG" = "main" ]; then
+            echo "Set existing_release_tag to the v<version> release whose assets should be replaced."
+            exit 1
+          fi
+          files=()
+          while IFS= read -r -d '' f; do
+            files+=("$f")
+          done < <(find artifacts -type f -print0)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No artifact files found to publish."
+            exit 1
+          fi
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG exists, uploading assets..."
+            gh release upload "$RELEASE_TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+              echo "Release $RELEASE_TAG does not exist; refusing to create a release from a manual asset refresh."
+              exit 1
+            fi
+            echo "Creating release $RELEASE_TAG..."
+            gh release create "$RELEASE_TAG" "${files[@]}" \
+              --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes \
+              --title "JanesCriber $RELEASE_TAG"
+          fi

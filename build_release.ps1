@@ -54,6 +54,7 @@ Write-Host "Building the self-contained JanesCriber runtime..." -ForegroundColor
     --hidden-import proctap.backends.windows `
     --hidden-import vosk `
     --collect-all vosk `
+    --collect-all whisper `
     --hidden-import transformers `
     --collect-submodules transformers.models.wav2vec2 `
     @qwenPyInstallerArgs `
