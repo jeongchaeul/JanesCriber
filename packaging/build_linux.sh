@@ -56,7 +56,7 @@ resolve_executable() {
   printf '%s\n' "$resolved"
 }
 
-for command_name in uv npm cargo tar sha256sum install realpath; do
+for command_name in uv npm cargo tar sha256sum install realpath strip; do
   require_command "$command_name"
 done
 
@@ -113,6 +113,13 @@ BUILT_ENGINE="$PYINSTALLER_ROOT/dist/JanesCriberEngine"
   exit 1
 }
 cp -a -- "$BUILT_ENGINE/." "$RUNTIME_ENGINE/"
+
+echo "Optimizing engine size (removing static libraries, test suites, and stripping symbols)..."
+find "$RUNTIME_ENGINE" -type f -name '*.a' -delete
+find "$RUNTIME_ENGINE" -type d \( -name 'include' -o -name 'tests' -o -name 'test' \) -exec rm -rf {} + 2>/dev/null || true
+find "$RUNTIME_ENGINE" -type f -name '*.so*' -exec strip --strip-unneeded {} + 2>/dev/null || true
+strip --strip-unneeded "$RUNTIME_ENGINE/JanesCriberEngine" 2>/dev/null || true
+
 install -m 0755 -- "$FFMPEG_PATH" "$RUNTIME_BIN/ffmpeg"
 install -m 0755 -- "$FFPROBE_PATH" "$RUNTIME_BIN/ffprobe"
 if [[ -f "$REPO_ROOT/LICENSE" ]]; then
@@ -187,13 +194,21 @@ fi
   exit 1
 }
 install -m 0755 -- "$TAURI_EXECUTABLE" "$PAYLOAD_ROOT/JanesCriber"
+strip --strip-unneeded "$PAYLOAD_ROOT/JanesCriber" 2>/dev/null || true
 
-tar -C "$BUILD_ROOT/payload" -czf "$ARCHIVE" JanesCriber
+echo "Compressing Linux portable archive (maximum gzip compression)..."
+GZIP=-9 tar -C "$BUILD_ROOT/payload" -czf "$ARCHIVE" JanesCriber
 (
   cd -- "$OUTPUT_DIR"
   sha256sum "$(basename -- "$ARCHIVE")" >"$(basename -- "$ARCHIVE").sha256"
 )
-echo "Created $ARCHIVE"
+
+ARCHIVE_SIZE=$(wc -c < "$ARCHIVE" | tr -d ' ')
+echo "Created $ARCHIVE ($ARCHIVE_SIZE bytes, $(( ARCHIVE_SIZE / 1024 / 1024 )) MB)"
+if (( ARCHIVE_SIZE >= 2147483648 )); then
+  echo "Error: Archive size ($ARCHIVE_SIZE bytes) exceeds the GitHub Releases 2GB asset limit." >&2
+  exit 1
+fi
 
 if ((KEEP_STAGING == 0)); then
   rm -rf -- "$BUILD_ROOT"
