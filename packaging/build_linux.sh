@@ -56,7 +56,7 @@ resolve_executable() {
   printf '%s\n' "$resolved"
 }
 
-for command_name in uv npm cargo tar sha256sum install realpath strip; do
+for command_name in uv npm cargo tar sha256sum install realpath strip split; do
   require_command "$command_name"
 done
 
@@ -196,18 +196,33 @@ fi
 install -m 0755 -- "$TAURI_EXECUTABLE" "$PAYLOAD_ROOT/JanesCriber"
 strip --strip-unneeded "$PAYLOAD_ROOT/JanesCriber" 2>/dev/null || true
 
-echo "Compressing Linux portable archive (maximum gzip compression)..."
-GZIP=-9 tar -C "$BUILD_ROOT/payload" -czf "$ARCHIVE" JanesCriber
-(
-  cd -- "$OUTPUT_DIR"
-  sha256sum "$(basename -- "$ARCHIVE")" >"$(basename -- "$ARCHIVE").sha256"
-)
+echo "Compressing Linux portable archive..."
+if command -v pigz >/dev/null 2>&1; then
+  tar -C "$BUILD_ROOT/payload" -c JanesCriber | pigz -9 > "$ARCHIVE"
+else
+  tar -C "$BUILD_ROOT/payload" -czf "$ARCHIVE" JanesCriber
+fi
 
 ARCHIVE_SIZE=$(wc -c < "$ARCHIVE" | tr -d ' ')
 echo "Created $ARCHIVE ($ARCHIVE_SIZE bytes, $(( ARCHIVE_SIZE / 1024 / 1024 )) MB)"
+
 if (( ARCHIVE_SIZE >= 2147483648 )); then
-  echo "Error: Archive size ($ARCHIVE_SIZE bytes) exceeds the GitHub Releases 2GB asset limit." >&2
-  exit 1
+  echo "Archive size exceeds the GitHub Releases 2GB asset limit (2147483648 bytes)."
+  echo "Splitting into multi-part archive (<=1900MB per part)..."
+  split -b 1900M "$ARCHIVE" "$ARCHIVE.part-"
+  rm -f -- "$ARCHIVE"
+  (
+    cd -- "$OUTPUT_DIR"
+    for part in $(ls $(basename -- "$ARCHIVE").part-*); do
+      sha256sum "$part" > "$part.sha256"
+      echo "  - $part ($(wc -c < "$part" | tr -d ' ') bytes)"
+    done
+  )
+else
+  (
+    cd -- "$OUTPUT_DIR"
+    sha256sum "$(basename -- "$ARCHIVE")" > "$(basename -- "$ARCHIVE").sha256"
+  )
 fi
 
 if ((KEEP_STAGING == 0)); then
