@@ -69,7 +69,7 @@ cargo --version >/dev/null
 cd -- "$REPO_ROOT"
 uv sync --locked --dev --python 3.11
 uv run --locked pyinstaller --version >/dev/null
-VERSION="$(uv run --locked python -c 'import re; print(re.search(r"__version__\s*=\s*\"([^\"]+)\"", open("src/janescriber/__init__.py").read()).group(1))' 2>/dev/null)"
+VERSION="$(uv run --locked python -c 'import re; print(re.search(r"__version__\s*=\s*\"([^\"]+)\"", open("src/janescriber/__init__.py").read()).group(1))' 2>/dev/null | tr -d '\r')"
 if [[ -z "$VERSION" ]]; then
   echo "Could not determine the version from src/janescriber/__init__.py." >&2
   exit 1
