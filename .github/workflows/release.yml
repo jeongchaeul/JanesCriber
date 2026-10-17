@@ -153,7 +153,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-x86_64-release
-          if-no-files-found: warn
+          if-no-files-found: error
           path: |
             dist/JanesCriber-*-linux-x86_64.tar.gz
             dist/JanesCriber-*-linux-x86_64.tar.gz.sha256
@@ -236,7 +236,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: macos-${{ matrix.arch }}-release
-          if-no-files-found: warn
+          if-no-files-found: error
           path: |
             dist/JanesCriber-*-macos-${{ matrix.arch }}.dmg
             dist/JanesCriber-*-macos-${{ matrix.arch }}.dmg.sha256

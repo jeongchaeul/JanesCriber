@@ -80,12 +80,6 @@ assert_macho_arch() {
   fi
 }
 
-cleanup() {
-  if ((KEEP_STAGING == 0)) && [[ -n "$BUILD_ROOT" && -d "$BUILD_ROOT" && "$BUILD_ROOT" == "$OUTPUT_DIR"/consumer-build-* ]]; then
-    rm -rf -- "$BUILD_ROOT"
-  fi
-}
-trap cleanup EXIT
 
 for command_name in uv npm cargo codesign file find grep hdiutil install lipo shasum sysctl xattr; do
   require_command "$command_name"
@@ -134,7 +128,7 @@ fi
 uv run --locked pyinstaller --noconfirm --clean --onedir --contents-directory _internal \
   --name JanesCriberEngine \
   --paths "$REPO_ROOT/src" \
-  "${EXTRA_PYINSTALLER_ARGS[@]}" \
+  ${EXTRA_PYINSTALLER_ARGS[@]+"${EXTRA_PYINSTALLER_ARGS[@]}"} \
   --collect-all whisper \
   --hidden-import transformers \
   --collect-submodules transformers.models.wav2vec2 \
@@ -253,3 +247,7 @@ tar -C "$PAYLOAD_ROOT" -czf "$TAR_OUTPUT" JanesCriber.app
 )
 
 echo "Created $DMG_OUTPUT and $TAR_OUTPUT"
+
+if ((KEEP_STAGING == 0)); then
+  rm -rf -- "$BUILD_ROOT"
+fi

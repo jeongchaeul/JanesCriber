@@ -98,7 +98,7 @@ fi
 uv run --locked pyinstaller --noconfirm --clean --onedir --contents-directory _internal \
   --name JanesCriberEngine \
   --paths "$REPO_ROOT/src" \
-  "${EXTRA_PYINSTALLER_ARGS[@]}" \
+  ${EXTRA_PYINSTALLER_ARGS[@]+"${EXTRA_PYINSTALLER_ARGS[@]}"} \
   --collect-all whisper \
   --hidden-import transformers \
   --collect-submodules transformers.models.wav2vec2 \
