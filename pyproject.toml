@@ -12,7 +12,7 @@ dependencies = [
   "soundcard>=0.4.6",
   "sounddevice>=0.5.1",
   "transformers>=4.45,<5",
-  "vosk>=0.3.45",
+  "vosk>=0.3.45; sys_platform != 'darwin'",
   "torch>=2.7.1,<2.8; sys_platform != 'win32'",
 ]
 

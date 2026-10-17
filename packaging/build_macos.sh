@@ -126,11 +126,15 @@ rm -f -- "$DMG_OUTPUT" "$DMG_OUTPUT.sha256" "$TAR_OUTPUT" "$TAR_OUTPUT.sha256"
 mkdir -p -- "$RUNTIME_ENGINE" "$RUNTIME_BIN" "$PYINSTALLER_ROOT/spec"
 
 echo "Building the frozen engine (onedir)..."
+EXTRA_PYINSTALLER_ARGS=()
+if uv run --locked python -c "import vosk" >/dev/null 2>&1; then
+  EXTRA_PYINSTALLER_ARGS+=(--hidden-import vosk --collect-all vosk)
+fi
+
 uv run --locked pyinstaller --noconfirm --clean --onedir --contents-directory _internal \
   --name JanesCriberEngine \
   --paths "$REPO_ROOT/src" \
-  --hidden-import vosk \
-  --collect-all vosk \
+  "${EXTRA_PYINSTALLER_ARGS[@]}" \
   --collect-all whisper \
   --hidden-import transformers \
   --collect-submodules transformers.models.wav2vec2 \
@@ -151,7 +155,7 @@ if [[ -f "$REPO_ROOT/LICENSE" ]]; then
   install -m 0644 -- "$REPO_ROOT/LICENSE" "$PAYLOAD_ROOT/LICENSE"
 fi
 install -m 0644 -- "$REPO_ROOT/README.md" "$PAYLOAD_ROOT/README.md"
-"$RUNTIME_ENGINE/JanesCriberEngine" --help >/dev/null
+"$RUNTIME_ENGINE/JanesCriberEngine" --help
 
 TAURI_CONFIG="$BUILD_ROOT/tauri.release.json"
 export JANESCRIBER_RELEASE_VERSION="$VERSION"
@@ -184,12 +188,27 @@ export npm_config_cache="$BUILD_ROOT/npm-cache"
 )
 
 mkdir -p -- "$APP_MACOS" "$APP_RESOURCES"
-TAURI_EXECUTABLE="$TAURI_TARGET/release/janescriber-studio"
-if [[ ! -x "$TAURI_EXECUTABLE" ]]; then
-  TAURI_EXECUTABLE="$TAURI_TARGET/release/janescriber"
+TAURI_EXECUTABLE=""
+for candidate in \
+  "$TAURI_TARGET/release/janescriber-studio" \
+  "$TAURI_TARGET/release/janescriber" \
+  "$TAURI_TARGET/release/JanesCriber" \
+  "$TAURI_TARGET/release/JanesCriberStudio" \
+  "$REPO_ROOT/desktop-ui/src-tauri/target/release/janescriber-studio" \
+  "$REPO_ROOT/desktop-ui/src-tauri/target/release/janescriber" \
+  "$REPO_ROOT/desktop-ui/src-tauri/target/release/JanesCriber"; do
+  if [[ -x "$candidate" ]]; then
+    TAURI_EXECUTABLE="$candidate"
+    break
+  fi
+done
+
+if [[ -z "$TAURI_EXECUTABLE" ]]; then
+  TAURI_EXECUTABLE="$(find "$TAURI_TARGET" "$REPO_ROOT/desktop-ui/src-tauri/target" -maxdepth 3 -type f -perm -111 \( -iname 'janescriber*' \) ! -name '*.so' ! -name '*.dylib' ! -name '*.d' -print -quit 2>/dev/null || true)"
 fi
-[[ -x "$TAURI_EXECUTABLE" ]] || {
-  echo "Tauri did not produce the expected executable." >&2
+
+[[ -n "$TAURI_EXECUTABLE" && -x "$TAURI_EXECUTABLE" ]] || {
+  echo "Tauri did not produce the expected executable in $TAURI_TARGET." >&2
   exit 1
 }
 install -m 0755 -- "$TAURI_EXECUTABLE" "$APP_MACOS/JanesCriber"

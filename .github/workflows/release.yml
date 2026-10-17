@@ -109,7 +109,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential curl file libayatana-appindicator3-dev libfuse2 libssl-dev \
+            build-essential curl file libasound2 libasound2-dev libayatana-appindicator3-dev libfuse2 libssl-dev \
             libwebkit2gtk-4.1-dev libxdo-dev librsvg2-dev patchelf wget xz-utils
       - name: Set up Rust
         run: |
@@ -175,16 +175,6 @@ jobs:
             ffprobe-asset: ffprobe-darwin-arm64
             ffprobe-url: https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffprobe-darwin-arm64
             ffprobe-sha256: bb2db6f5d8cef919da12fbf592119a987202a8c060a886f3cab091f9cab90b64
-          - arch: x86_64
-            runner: macos-15-intel
-            python-architecture: x64
-            node-architecture: x64
-            ffmpeg-asset: ffmpeg-darwin-x64
-            ffmpeg-url: https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-x64
-            ffmpeg-sha256: ebdddc936f61e14049a2d4b549a412b8a40deeff6540e58a9f2a2da9e6b18894
-            ffprobe-asset: ffprobe-darwin-x64
-            ffprobe-url: https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffprobe-darwin-x64
-            ffprobe-sha256: fa3add0ce901f7241abe0dfc0155d958fc834aca3f8ce61f87cc712ae669c1e0
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
